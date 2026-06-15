@@ -139,10 +139,10 @@ body{background:var(--bg-primary); color:var(--text-primary);
 .zone.hl{border:2px solid var(--gold); animation:pulseHl 1s infinite; z-index:5;}
 .zone.sel{outline:3px solid var(--gold); outline-offset:-1px; z-index:5;}
 .zone.sel::after{content:'⚔'; position:absolute; top:-10px; left:50%; transform:translateX(-50%); font-size:14px; filter:drop-shadow(0 0 6px var(--gold));}
-.b-center{flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1px 10px; min-height:42px; overflow:hidden;
+.b-center{flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1px 10px; min-height:60px; overflow:hidden;
   background:linear-gradient(90deg,transparent,rgba(124,58,237,.16),transparent);}
 .b-phase{font-size:10px; color:var(--accent-light); letter-spacing:.22em; font-weight:800;}
-.b-log{font-size:11px; color:var(--text-secondary); text-align:center; line-height:1.45; max-height:34px; overflow:hidden; width:100%;}
+.b-log{font-size:11px; color:var(--text-secondary); text-align:center; line-height:1.45; max-height:52px; overflow:hidden; width:100%;}
 .b-hand{display:flex; gap:6px; overflow-x:auto; padding:5px 8px 4px; flex:none; min-height:103px; align-items:center; -webkit-overflow-scrolling:touch;}
 .hand-card{flex:0 0 68px; width:68px; height:95px; transition:transform .15s;}
 .hand-card.playable{box-shadow:0 0 10px rgba(168,85,247,.8); border-color:var(--accent-light);}
@@ -712,13 +712,15 @@ const BGM = {
         if (this.el.paused){ try{ const p=this.el.play(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
         this.fade(this.vol);
       } else {
-        this.fade(0, ()=>{ try{ this.el.pause(); }catch(e){} });
+        clearInterval(this._fd);
+        try{ this.el.pause(); this.el.volume = 0; }catch(e){}
       }
       return;
     }
     this.cur = target;
     if (!target){
-      this.fade(0, ()=>{ try{ this.el.pause(); }catch(e){} });
+      clearInterval(this._fd);
+      try{ this.el.pause(); this.el.volume = 0; }catch(e){}
       return;
     }
     const src = this.files[target];
@@ -764,7 +766,10 @@ function desiredBgm(){
 }
 function updateBgm(){ BGM.setWant(desiredBgm()); }
 
-window.addEventListener('pointerdown', ()=>{ AE.init(); BGM.arm(); }, {once:false});
+function zilchAudioUnlock(){ AE.init(); BGM.arm(); }
+window.addEventListener('pointerdown', zilchAudioUnlock, {passive:true});
+window.addEventListener('touchend', zilchAudioUnlock, {passive:true});
+window.addEventListener('click', zilchAudioUnlock, true);
 
 /* ===================== 演出ヘルパー ===================== */
 const app = document.getElementById('app');
@@ -1124,14 +1129,18 @@ async function gachaPull(){
   /* 保証枠：5枚目はR以上 */
   if (got.every(id=>CARDS[id].rarity==='N')) got[4] = randomCardOf(['R','SR'][Math.random()<.8?0:1]);
   /* 3枚目以降のダブりは自動でジェムに変換 */
-  const DUP_GEMS = {N:20, R:40, SR:100, UR:200, ZR:400};
+  const DUP_GEMS = {N:5, R:10, SR:25, UR:50, ZR:80};
+  const REFUND_CAP = 100; /* 1パックの払い戻し合計上限：必ず消費(300)が上回るように */
+  let refundTotal = 0;
   const meta = [];
   for (const id of got){
     const c = CARDS[id];
     if ((S.coll[id]||0) >= 2){
-      const g = DUP_GEMS[c.rarity] || 20;
+      let g = DUP_GEMS[c.rarity] || 5;
+      g = Math.max(0, Math.min(g, REFUND_CAP - refundTotal));
+      refundTotal += g;
       S.gems += g;
-      meta.push({dup:g});
+      meta.push({dup:true, g:g});
     } else {
       meta.push({isNew: !(S.coll[id] > 0)});
       S.coll[id] = (S.coll[id]||0) + 1;
@@ -1146,7 +1155,7 @@ async function gachaPull(){
       const c = CARDS[cid], rc = RARITY_CONFIG[c.rarity];
       const mt = meta[i] || {};
       const extra = mt.isNew ? ' <span style="color:#4ade80">NEW!</span>'
-        : mt.dup ? ' <span style="color:var(--gold)">+💎'+mt.dup+'</span>' : '';
+        : mt.dup ? (mt.g > 0 ? ' <span style="color:var(--gold)">+💎'+mt.g+'</span>' : ' <span style="color:var(--text-muted)">ダブり</span>') : '';
       html += '<div style="animation-delay:'+(i*.28)+'s" class="gacha-card">'
         + cardMiniHTML(cid,{glow:true})
         + '<div class="rar-label" style="color:'+rc.hex+'">'+c.rarity+extra+'</div></div>';
@@ -1266,7 +1275,7 @@ function log(msg){
   if (!G) return;
   G.log.push(msg);
   const el = q('#b-log');
-  if (el) el.innerHTML = G.log.slice(-2).map(esc).join('<br>');
+  if (el) el.innerHTML = G.log.slice(-3).map(esc).join('<br>');
 }
 function makeMon(cid, o={}){
   return {uid:++G.uid, cid, atkMod:0, tempAtk:0, pos:o.pos||'atk', sick:true,
@@ -2278,6 +2287,7 @@ async function declareAttack(aSide, ai, target){
   A.battleBonus = 0;
   for (const t of fieldMons(dSide)) t.m.battleBonus = 0;
   renderBattle();
+  if (G && !G.over && G.turnSide === 'p2') await sleep(750);
 }
 async function onBattleKill(aSide, ai, killedCid, dSide){
   const A = G[aSide].mz[ai];
@@ -2585,7 +2595,7 @@ function renderBattle(){
     + szHTML('p2')
     + mzHTML('p2')
     + '<div class="b-center"><div class="b-phase">'+esc(phase)+'</div>'
-    + '<div class="b-log" id="b-log">'+G.log.slice(-2).map(esc).join('<br>')+'</div></div>'
+    + '<div class="b-log" id="b-log">'+G.log.slice(-3).map(esc).join('<br>')+'</div></div>'
     + mzHTML('p1')
     + szHTML('p1')
     + lpBarHTML('p1')
@@ -2779,6 +2789,7 @@ function maxEnemyAtkOf(side){
   const ts = fieldMons(opp(side));
   return ts.length ? Math.max(...ts.map(t=>t.m.pos==='atk' ? effAtk(opp(side),t.m) : effDef(opp(side),t.m))) : 0;
 }
+async function cpuBeat(ms){ if (G && !G.over) await sleep(ms || 1000); }
 async function cpuMain(){
   if (!G || G.over) return;
   const P = G.p2;
@@ -2787,6 +2798,7 @@ async function cpuMain(){
     const i = P.hand.findIndex(cid=>CARDS[cid].type==='monster' && canHandSpecial('p2', cid));
     if (i < 0) break;
     await handSpecialFlow('p2', i);
+    await cpuBeat();
   }
   if (!G || G.over) return;
   /* 2. 生贄召喚（場の最弱より強い★5以上がいれば） */
@@ -2798,7 +2810,7 @@ async function cpuMain(){
       const need = c.lv >= 7 ? 2 : 1;
       return fieldMons('p2').length >= need && c.atk > effAtk('p2', weakest.m) + 300;
     });
-    if (hi >= 0) await normalSummonFlow('p2', hi, 'atk');
+    if (hi >= 0){ await normalSummonFlow('p2', hi, 'atk'); await cpuBeat(); }
   }
   if (!G || G.over) return;
   /* 3. 通常召喚（★4以下の最良） */
@@ -2813,6 +2825,7 @@ async function cpuMain(){
       const en = maxEnemyAtkOf('p2');
       const pos = (c.atk >= c.def || c.atk > en) ? 'atk' : 'def';
       await normalSummonFlow('p2', best, pos);
+      await cpuBeat();
     }
   }
   if (!G || G.over) return;
@@ -2838,7 +2851,7 @@ async function cpuMain(){
       if (play && spellCondition('p2', cid)){
         await playSpellFromHand('p2', i);
         used = true;
-        await sleep(350);
+        await cpuBeat();
         break;
       }
     }
@@ -2851,7 +2864,7 @@ async function cpuMain(){
     const i = P.hand.findIndex(cid=>CARDS[cid].type==='trap');
     if (i < 0) break;
     await setCard('p2', i);
-    await sleep(250);
+    await cpuBeat(700);
   }
 }
 async function cpuBattle(){
@@ -2889,14 +2902,14 @@ async function cpuBattle(){
       }
     }
     if (!acted) return;
-    await sleep(500);
+    await cpuBeat(1100);
   }
 }
 async function cpuTurn(){
   if (!G || G.over) return;
   UI.busy = true;
   try{
-    await sleep(700);
+    await sleep(950);
     await cpuMain();
     if (!G.over && G.gturn > 1 && fieldMons('p2').some(t=>canAttackPredict(t.m))){
       await toBattlePhase('p2');
@@ -3013,27 +3026,64 @@ app.addEventListener('click', async e=>{
     case 'deck-clear': AE.button(); S.deck = []; save(); renderDeck(); break;
     case 'deck-auto': {
       AE.button();
+      /* 所持カード（同名2枚まで）をプールに */
       const pool = [];
       for (const id of ALL_IDS){
         const n = Math.min(2, S.coll[id]||0);
         for (let k=0;k<n;k++) pool.push(id);
       }
-      const mons = pool.filter(id=>CARDS[id].type==='monster').sort((a,b)=>{
-        const ca=CARDS[a], cb=CARDS[b];
-        return (cb.atk+cb.def-(cb.lv>=5?1300:0)) - (ca.atk+ca.def-(ca.lv>=5?1300:0));
-      });
-      const spells = shuffle(pool.filter(id=>CARDS[id].type==='spell'));
-      const traps = shuffle(pool.filter(id=>CARDS[id].type==='trap'));
-      const deck = mons.slice(0,12).concat(spells.slice(0,5), traps.slice(0,3));
-      for (const id of pool){
-        if (deck.length >= 20) break;
-        const inDeck = deck.filter(x=>x===id).length;
-        if (inDeck < Math.min(2, S.coll[id]||0)) deck.push(id);
+      if (pool.length < 20){ toast('カードが足りない…ガチャで増やそう'); break; }
+      /* 生贄なしで出せる上級モンスター（特殊召喚条件持ち）は重い扱いにしない */
+      const easySpecial = id => ['ZR002','TK006','TK012','ZC013','ZR011'].includes(id);
+      const rB = {N:0, R:60, SR:150, UR:260, ZR:360};
+      const monScore = id => {
+        const c = CARDS[id];
+        let v = c.atk + c.def * 0.35;
+        if (c.lv >= 7 && !easySpecial(id)) v -= 1500;       // 生贄2体ぶん重い
+        else if (c.lv >= 5 && !easySpecial(id)) v -= 700;   // 生贄1体ぶん重い
+        if (!/^通常モンスター/.test(c.desc)) v += 350;        // 効果モンスター加点
+        v += rB[c.rarity] || 0;
+        return v;
+      };
+      const useScore = id => {
+        const c = CARDS[id];
+        let v = (rB[c.rarity] || 0) + 40;
+        if (/ドロー|手札に加える|サーチ|特殊召喚|破壊|無効|ダメージ/.test(c.desc)) v += 220;
+        if (/アップ|攻撃力を|ATK/.test(c.desc)) v += 130;
+        return v;
+      };
+      const mons = pool.filter(id=>CARDS[id].type==='monster').sort((a,b)=>monScore(b)-monScore(a));
+      const spells = pool.filter(id=>CARDS[id].type==='spell').sort((a,b)=>useScore(b)-useScore(a));
+      const traps = pool.filter(id=>CARDS[id].type==='trap').sort((a,b)=>useScore(b)-useScore(a));
+      const deck = [];
+      let heavy = 0;
+      /* 強いモンスターから最大14枚。生贄が要る上級は最大3枚まで（事故防止） */
+      for (const id of mons){
+        if (deck.length >= 14) break;
+        const c = CARDS[id];
+        const isHeavy = c.lv >= 5 && !easySpecial(id);
+        if (isHeavy && heavy >= 3) continue;
+        if (isHeavy) heavy++;
+        deck.push(id);
+      }
+      for (const id of spells){ if (deck.length >= 18) break; deck.push(id); }
+      for (const id of traps){ if (deck.length >= 20) break; deck.push(id); }
+      /* 20枚に満たなければ、残りの強いカードで埋める */
+      if (deck.length < 20){
+        const rest = pool.slice().sort((a,b)=>{
+          const sa = CARDS[a].type==='monster' ? monScore(a) : useScore(a);
+          const sb = CARDS[b].type==='monster' ? monScore(b) : useScore(b);
+          return sb - sa;
+        });
+        for (const id of rest){
+          if (deck.length >= 20) break;
+          const have = Math.min(2, S.coll[id]||0);
+          if (deck.filter(x=>x===id).length < have) deck.push(id);
+        }
       }
       S.deck = deck.slice(0,20);
       save();
-      if (S.deck.length < 20) toast('カードが足りない…ガチャで増やそう');
-      else toast('おまかせ編成完了！');
+      toast(S.deck.length === 20 ? '最強デッキを編成しました！' : 'カードが足りない…ガチャで増やそう');
       renderDeck();
       break;
     }

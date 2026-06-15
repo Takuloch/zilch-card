@@ -675,73 +675,74 @@ const AE = {
    ・オンライン対戦: Zilch＆Furious
    iPhoneは自動再生禁止のため、最初のタップで再生開始。各曲ループ。 */
 const BGM = {
-  els:{}, cur:null, want:'menu', armed:false, built:false, vol:0.5,
+  el:null, cur:null, want:'menu', armed:false, vol:0.5, _fd:null,
   files:{ menu:'bgm/menu.mp3', gacha:'bgm/gacha.mp3', daiki:'bgm/daiki.mp3',
           hiro:'bgm/hiro.mp3', takuya:'bgm/takuya.mp3', online:'bgm/online.mp3' },
   get on(){ return S ? S.bgm !== false : true; },
   ensure(){
-    if (this.built) return;
-    this.built = true;
-    for (const k in this.files){
+    if (!this.el){
       try{
-        const a = new Audio(this.files[k]);
-        a.loop = true; a.preload = 'auto'; a.volume = 0;
-        a.setAttribute('playsinline','');
-        this.els[k] = a;
+        this.el = new Audio();
+        this.el.loop = true;
+        this.el.preload = 'auto';
+        this.el.volume = 0;
+        this.el.setAttribute('playsinline','');
       }catch(e){}
     }
   },
-  /* iPhone対策：最初のユーザータップで全曲を一度再生→即停止して「解錠」する。
-     これをしておくと以降はタップ外でも play()/pause() で自由に切替できる。 */
+  /* iPhone対策：音声要素は1個だけ。最初のタップ（非asyncのpointerdownリスナー）で
+     再生して解錠する。以降は曲のsrcを差し替えてplay()するが、画面遷移は必ずタップで
+     起きるので play() はユーザー操作中（同期）に実行され、iOSでも許可される。 */
   arm(){
     this.ensure();
-    if (!this.armed){
-      this.armed = true;
-      for (const k in this.els){
-        const a = this.els[k];
-        try{
-          a.volume = 0;
-          const p = a.play();
-          if (p && p.then) p.then(()=>{ if (k !== this.cur){ try{ a.pause(); a.currentTime = 0; }catch(e){} } }).catch(()=>{});
-        }catch(e){}
-      }
-    }
+    this.armed = true;
     this.apply();
   },
   setWant(k){ this.want = k; this.apply(); },
   apply(){
     if (!this.armed) return;
     this.ensure();
+    if (!this.el) return;
     const target = this.on ? this.want : null;
     if (target === this.cur){
-      if (target && this.els[target]){
-        const a = this.els[target];
-        if (a.paused){ try{ const p=a.play(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
-        this.fadeTo(a, this.vol);
+      if (target){
+        if (this.el.paused){ try{ const p=this.el.play(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
+        this.fade(this.vol);
+      } else {
+        this.fade(0, ()=>{ try{ this.el.pause(); }catch(e){} });
       }
       return;
     }
-    const prev = this.cur ? this.els[this.cur] : null;
     this.cur = target;
-    if (prev) this.fadeTo(prev, 0, ()=>{ try{ prev.pause(); }catch(e){} });
-    if (target && this.els[target]){
-      const a = this.els[target];
-      try{ a.volume = 0; const p = a.play(); if (p && p.catch) p.catch(()=>{}); }catch(e){}
-      this.fadeTo(a, this.vol);
+    if (!target){
+      this.fade(0, ()=>{ try{ this.el.pause(); }catch(e){} });
+      return;
     }
+    const src = this.files[target];
+    if (!src) return;
+    /* src差し替え＋play()はここで同期実行（タップのユーザー操作中に呼ばれる） */
+    try{
+      this.el.src = src;
+      this.el.currentTime = 0;
+      this.el.volume = 0;
+      const p = this.el.play();
+      if (p && p.catch) p.catch(()=>{});
+    }catch(e){}
+    this.fade(this.vol);
   },
-  fadeTo(a, to, done){
-    if (!a) return;
-    if (a._fd) clearInterval(a._fd);
-    a._fd = setInterval(()=>{
-      const v = a.volume, d = to - v;
+  fade(to, done){
+    clearInterval(this._fd);
+    if (!this.el) return;
+    this._fd = setInterval(()=>{
+      if (!this.el){ clearInterval(this._fd); return; }
+      const v = this.el.volume, d = to - v;
       if (Math.abs(d) < 0.05){
-        try{ a.volume = Math.max(0, Math.min(1, to)); }catch(e){}
-        clearInterval(a._fd); a._fd = null;
+        try{ this.el.volume = Math.max(0, Math.min(1, to)); }catch(e){}
+        clearInterval(this._fd); this._fd = null;
         if (done) done();
         return;
       }
-      try{ a.volume = Math.max(0, Math.min(1, v + d * 0.25)); }catch(e){}
+      try{ this.el.volume = Math.max(0, Math.min(1, v + d * 0.25)); }catch(e){}
     }, 40);
   },
 };

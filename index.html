@@ -221,6 +221,9 @@ hr.sep{border:none; border-top:1px solid var(--border-accent); margin:10px 0;}
 @keyframes toastIn{0%{opacity:0; transform:translate(-50%,-12px);}8%{opacity:1; transform:translate(-50%,0);}85%{opacity:1;}100%{opacity:0;}}
 .room-code{font-size:46px; font-weight:900; letter-spacing:.25em; color:var(--gold); text-shadow:0 0 26px rgba(245,158,11,.55); padding-left:.25em;}
 .room-code-in{font-size:28px; letter-spacing:.3em; text-align:center; font-variant-numeric:tabular-nums;}
+.save-box{width:100%; height:70px; resize:none; font-size:11px; font-family:ui-monospace,Menlo,monospace; padding:8px;
+  border-radius:8px; border:1px solid var(--border-accent); background:#08001a; color:var(--text-secondary);
+  user-select:text; -webkit-user-select:text; margin-bottom:8px; word-break:break-all; box-sizing:border-box;}
 </style>
 </head>
 <body>
@@ -874,6 +877,59 @@ document.addEventListener('click', e=>{
 }, true);
 document.addEventListener('contextmenu', e=>e.preventDefault());
 
+/* ===================== セーブのバックアップ / 復元 ===================== */
+function encodeSave(){
+  try{ return btoa(unescape(encodeURIComponent(JSON.stringify(S)))); }catch(e){ return ''; }
+}
+function decodeSave(str){
+  try{ return JSON.parse(decodeURIComponent(escape(atob(String(str).trim())))); }catch(e){ return null; }
+}
+function applyImportedSave(obj){
+  if (!obj || typeof obj !== 'object' || !obj.coll || typeof obj.coll !== 'object') return false;
+  const ns = obj;
+  if (typeof ns.gems !== 'number' || ns.gems < 0) ns.gems = 0;
+  if (!Array.isArray(ns.deck)) ns.deck = STARTER_DECK.slice();
+  for (const id of Object.keys(ns.coll)){ if (!CARDS[id] || !(ns.coll[id] > 0)) delete ns.coll[id]; }
+  ns.deck = ns.deck.filter(id=>CARDS[id]);
+  if (typeof ns.name !== 'string') ns.name = S.name || 'PLAYER';
+  S = ns;
+  S.gift = 0;
+  save();
+  return true;
+}
+function showSaveManager(){
+  const code = encodeSave();
+  const veil = document.createElement('div'); veil.className = 'veil';
+  veil.innerHTML = '<div class="detail-card">'
+    + '<div class="detail-close">✕</div>'
+    + '<div class="detail-name" style="font-size:16px">セーブのバックアップ / 復元</div>'
+    + '<div style="font-size:11px;color:var(--text-secondary);line-height:1.7;margin-bottom:8px">下のコードをコピーして、メモアプリやLINEで自分宛に送って保存しておけば、機種変更やデータ消去のあとでも記録を元に戻せます。</div>'
+    + '<div style="font-size:11px;color:var(--accent-light);margin-bottom:4px;font-weight:700">▼ あなたのセーブコード</div>'
+    + '<textarea class="save-box" id="save-out" readonly>'+esc(code)+'</textarea>'
+    + '<button class="btn small primary block" data-sv="copy">📋 コードをコピー</button>'
+    + '<hr class="sep">'
+    + '<div style="font-size:11px;color:var(--gold);margin-bottom:4px;font-weight:700">▼ コードを貼り付けて復元</div>'
+    + '<textarea class="save-box" id="save-in" placeholder="ここにセーブコードを貼り付け"></textarea>'
+    + '<button class="btn small gold block" data-sv="restore">このコードで復元する</button>'
+    + '</div>';
+  veil.addEventListener('click', async e=>{
+    if (e.target.closest('.detail-close') || e.target === veil){ veil.remove(); return; }
+    const b = e.target.closest('[data-sv]'); if (!b) return;
+    e.stopPropagation();
+    if (b.dataset.sv === 'copy'){
+      const t = veil.querySelector('#save-out');
+      try{ await navigator.clipboard.writeText(t.value); AE.button(); toast('コードをコピーしました'); }
+      catch(e2){ try{ t.focus(); t.select(); document.execCommand('copy'); toast('コードをコピーしました'); }catch(e3){ toast('長押しで全選択してコピーしてください'); } }
+    } else if (b.dataset.sv === 'restore'){
+      const v = veil.querySelector('#save-in').value;
+      if (!v.trim()){ toast('コードを貼り付けてください'); return; }
+      const obj = decodeSave(v);
+      if (!applyImportedSave(obj)){ toast('コードが正しくありません'); return; }
+      AE.button(); veil.remove(); toast('セーブを復元しました！'); go('home');
+    }
+  });
+  document.body.appendChild(veil);
+}
 /* ===================== カード詳細モーダル（長押し） ===================== */
 function showCardModal(cid){
   const c = CARDS[cid]; if (!c) return;
@@ -1029,6 +1085,7 @@ function renderHome(){
     + '<button class="btn" data-act="go" data-to="deck">🛠 デッキ編集</button>'
     + '<div style="display:flex;gap:10px"><button class="btn small" style="flex:1" data-act="toggle-sound">'+(S.sound!==false?'🔊 効果音ON':'🔇 効果音OFF')+'</button>'
     + '<button class="btn small" style="flex:1" data-act="toggle-bgm">'+(S.bgm!==false?'🎵 BGM ON':'🔕 BGM OFF')+'</button></div>'
+    + '<button class="btn small block" data-act="save-manage" style="border-color:var(--accent-light)">💾 セーブのバックアップ / 復元</button>'
     + '<button class="btn small danger block" data-act="reset-data">データ初期化</button>'
     + '</div><div style="font-size:10px;color:var(--text-muted);letter-spacing:.2em">ZILCH CARD ONLINE v2.0</div></div></div>';
 }
@@ -2899,6 +2956,7 @@ app.addEventListener('click', async e=>{
     case 'toggle-bgm':
       S.bgm = S.bgm === false; save(); AE.button(); BGM.apply(); render();
       break;
+    case 'save-manage': AE.button(); showSaveManager(); break;
     case 'reset-data': {
       const ok = await actionMenu('セーブデータを完全に消去しますか？', [{label:'消去する', value:true, cls:'danger'}]);
       if (ok){ localStorage.removeItem(SAVE_KEY); loadSave(); go('title'); toast('データを初期化しました'); }

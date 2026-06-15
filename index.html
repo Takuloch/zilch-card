@@ -675,55 +675,73 @@ const AE = {
    ・オンライン対戦: Zilch＆Furious
    iPhoneは自動再生禁止のため、最初のタップで再生開始。各曲ループ。 */
 const BGM = {
-  el:null, cur:null, want:'menu', armed:false, vol:0.5, _fade:null,
+  els:{}, cur:null, want:'menu', armed:false, built:false, vol:0.5,
   files:{ menu:'bgm/menu.mp3', gacha:'bgm/gacha.mp3', daiki:'bgm/daiki.mp3',
           hiro:'bgm/hiro.mp3', takuya:'bgm/takuya.mp3', online:'bgm/online.mp3' },
   get on(){ return S ? S.bgm !== false : true; },
   ensure(){
-    if (!this.el){
-      try{ this.el = new Audio(); this.el.loop = true; this.el.preload = 'auto'; this.el.volume = 0; }catch(e){}
+    if (this.built) return;
+    this.built = true;
+    for (const k in this.files){
+      try{
+        const a = new Audio(this.files[k]);
+        a.loop = true; a.preload = 'auto'; a.volume = 0;
+        a.setAttribute('playsinline','');
+        this.els[k] = a;
+      }catch(e){}
     }
   },
-  arm(){ if (this.armed) return; this.armed = true; this.apply(); },
+  /* iPhone対策：最初のユーザータップで全曲を一度再生→即停止して「解錠」する。
+     これをしておくと以降はタップ外でも play()/pause() で自由に切替できる。 */
+  arm(){
+    this.ensure();
+    if (!this.armed){
+      this.armed = true;
+      for (const k in this.els){
+        const a = this.els[k];
+        try{
+          a.volume = 0;
+          const p = a.play();
+          if (p && p.then) p.then(()=>{ if (k !== this.cur){ try{ a.pause(); a.currentTime = 0; }catch(e){} } }).catch(()=>{});
+        }catch(e){}
+      }
+    }
+    this.apply();
+  },
   setWant(k){ this.want = k; this.apply(); },
   apply(){
     if (!this.armed) return;
     this.ensure();
-    if (!this.el) return;
     const target = this.on ? this.want : null;
-    if (target === this.cur && (target === null || !this.el.paused)){
-      if (target) this.fade(this.vol);
+    if (target === this.cur){
+      if (target && this.els[target]){
+        const a = this.els[target];
+        if (a.paused){ try{ const p=a.play(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} }
+        this.fadeTo(a, this.vol);
+      }
       return;
     }
-    const doSwitch = ()=>{
-      this.cur = target;
-      if (!target){ try{ this.el.pause(); }catch(e){} return; }
-      const src = this.files[target];
-      if (!src){ try{ this.el.pause(); }catch(e){} return; }
-      try{
-        this.el.src = src;
-        this.el.currentTime = 0;
-        this.el.volume = 0;
-        const p = this.el.play();
-        if (p && p.then) p.then(()=>this.fade(this.vol)).catch(()=>{});
-      }catch(e){}
-    };
-    if (this.el && !this.el.paused && this.cur){ this.fade(0, doSwitch); }
-    else doSwitch();
+    const prev = this.cur ? this.els[this.cur] : null;
+    this.cur = target;
+    if (prev) this.fadeTo(prev, 0, ()=>{ try{ prev.pause(); }catch(e){} });
+    if (target && this.els[target]){
+      const a = this.els[target];
+      try{ a.volume = 0; const p = a.play(); if (p && p.catch) p.catch(()=>{}); }catch(e){}
+      this.fadeTo(a, this.vol);
+    }
   },
-  fade(to, done){
-    clearInterval(this._fade);
-    if (!this.el) return;
-    this._fade = setInterval(()=>{
-      if (!this.el){ clearInterval(this._fade); return; }
-      const v = this.el.volume, d = to - v;
+  fadeTo(a, to, done){
+    if (!a) return;
+    if (a._fd) clearInterval(a._fd);
+    a._fd = setInterval(()=>{
+      const v = a.volume, d = to - v;
       if (Math.abs(d) < 0.05){
-        try{ this.el.volume = Math.max(0, Math.min(1, to)); }catch(e){}
-        clearInterval(this._fade);
+        try{ a.volume = Math.max(0, Math.min(1, to)); }catch(e){}
+        clearInterval(a._fd); a._fd = null;
         if (done) done();
         return;
       }
-      try{ this.el.volume = Math.max(0, Math.min(1, v + d * 0.25)); }catch(e){}
+      try{ a.volume = Math.max(0, Math.min(1, v + d * 0.25)); }catch(e){}
     }, 40);
   },
 };
@@ -1384,7 +1402,7 @@ async function sendToGrave(side, cid, ctx={}){
   const P = G[side];
   P.grave.push(cid);
   renderBattle();
-  if (G.over) return;
+  if (!G || G.over) return;
   /* HD011: アンデットが墓地へ→500回復 */
   if (P.fieldSpell && P.fieldSpell.cid==='HD011' && CARDS[cid].type==='monster' && CARDS[cid].race==='アンデット族'){
     await heal(side, 500);
@@ -2131,7 +2149,7 @@ async function declareAttack(aSide, ai, target){
   /* HIROKI：ダメージステップ開始時に相手カード1枚破壊 */
   if (A.cid==='ZR004'){
     await hirokiSmash(aSide, A);
-    if (G.over) return;
+    if (!G || G.over) return;
     if (!target.direct && !G[dSide].mz[target.zi]){
       /* 攻撃対象自体を破壊した場合、相手フィールドが空ならダイレクトに移行 */
       if (!fieldMons(dSide).length) target = {direct:true};
@@ -2140,7 +2158,7 @@ async function declareAttack(aSide, ai, target){
   }
   /* 攻撃側 罠ウィンドウ */
   await attackerTrapWindow(aSide, A, target);
-  if (G.over) return;
+  if (!G || G.over) return;
   /* 攻撃対象が消えていたらダイレクトに切替えず終了 */
   if (!target.direct && !G[dSide].mz[target.zi]){ renderBattle(); return; }
   await animAttack(aSide, ai, target);
@@ -2257,7 +2275,7 @@ function clearEndOfTurn(){
   }
 }
 async function startTurn(side){
-  if (G.over) return;
+  if (!G || G.over) return;
   G.gturn++;
   G.turnSide = side;
   G.phase = 'main';
@@ -2278,7 +2296,7 @@ async function startTurn(side){
   await sleep(1000);
   /* スタンバイ：雨の路地裏 */
   if (P.fieldSpell && P.fieldSpell.cid==='ZC016') await heal(side, 500);
-  if (G.over) return;
+  if (!G || G.over) return;
   /* ドローフェイズ（先攻1ターン目はドローなし＝後攻との公平化） */
   if (G.gturn > 1){
     G.phase = 'draw';
@@ -2331,14 +2349,14 @@ async function endTurn(side){
       }
     }
   }
-  if (G.over) return;
+  if (!G || G.over) return;
   /* スパーリング戦士：戦闘を行ったターン終了時に1ドロー */
   for (const s of ['p1','p2']){
     for (const t of fieldMons(s)){
       if (t.m.cid==='ZR009' && t.m.battled && !effectsLocked()){
         log('「スパーリング戦士」は今日の反省をメモした。1ドロー！');
         await drawCards(s, 1);
-        if (G.over) return;
+        if (!G || G.over) return;
       }
     }
   }
@@ -2704,6 +2722,7 @@ function maxEnemyAtkOf(side){
   return ts.length ? Math.max(...ts.map(t=>t.m.pos==='atk' ? effAtk(opp(side),t.m) : effDef(opp(side),t.m))) : 0;
 }
 async function cpuMain(){
+  if (!G || G.over) return;
   const P = G.p2;
   /* 1. 手札からの特殊召喚 */
   for (let g=0; g<6 && !G.over; g++){
@@ -2711,7 +2730,7 @@ async function cpuMain(){
     if (i < 0) break;
     await handSpecialFlow('p2', i);
   }
-  if (G.over) return;
+  if (!G || G.over) return;
   /* 2. 生贄召喚（場の最弱より強い★5以上がいれば） */
   if (!G.normalSummoned.p2 && fieldMons('p2').length){
     const weakest = fieldMons('p2').sort((a,b)=>effAtk('p2',a.m)-effAtk('p2',b.m))[0];
@@ -2723,7 +2742,7 @@ async function cpuMain(){
     });
     if (hi >= 0) await normalSummonFlow('p2', hi, 'atk');
   }
-  if (G.over) return;
+  if (!G || G.over) return;
   /* 3. 通常召喚（★4以下の最良） */
   if (!G.normalSummoned.p2 && freeMZ('p2') >= 0){
     let best = -1, bv = -1;
@@ -2738,7 +2757,7 @@ async function cpuMain(){
       await normalSummonFlow('p2', best, pos);
     }
   }
-  if (G.over) return;
+  if (!G || G.over) return;
   /* 4. 魔法カード */
   for (let g=0; g<4 && !G.over; g++){
     const myMax = fieldMons('p2').length ? Math.max(...fieldMons('p2').map(t=>effAtk('p2',t.m))) : 0;
@@ -2767,7 +2786,7 @@ async function cpuMain(){
     }
     if (!used) break;
   }
-  if (G.over) return;
+  if (!G || G.over) return;
   /* 5. 罠・魔法をセット */
   for (let g=0; g<5 && !G.over; g++){
     if (freeSZ('p2') < 0) break;
@@ -2778,6 +2797,7 @@ async function cpuMain(){
   }
 }
 async function cpuBattle(){
+  if (!G || G.over) return;
   for (let g=0; g<14; g++){
     if (!G || G.over || G.phase !== 'battle') return;
     const attackers = fieldMons('p2').filter(t=>canAttack('p2', t.m))

@@ -669,7 +669,80 @@ const AE = {
     else { this.tone(440,.1,{type:'triangle',vol:.09}); }
   },
 };
-window.addEventListener('pointerdown', ()=>AE.init(), {once:false});
+/* ===================== BGM（場面ごとに自作曲を再生） =====================
+   ・メニュー: ブーコンモニター〜next day〜 / ガチャ: ズッコケ3人組
+   ・CPU戦: DAIKI/HIRO/TAKUYAは各テーマ曲、HIROKIは曲なし
+   ・オンライン対戦: Zilch＆Furious
+   iPhoneは自動再生禁止のため、最初のタップで再生開始。各曲ループ。 */
+const BGM = {
+  el:null, cur:null, want:'menu', armed:false, vol:0.5, _fade:null,
+  files:{ menu:'bgm/menu.mp3', gacha:'bgm/gacha.mp3', daiki:'bgm/daiki.mp3',
+          hiro:'bgm/hiro.mp3', takuya:'bgm/takuya.mp3', online:'bgm/online.mp3' },
+  get on(){ return S ? S.bgm !== false : true; },
+  ensure(){
+    if (!this.el){
+      try{ this.el = new Audio(); this.el.loop = true; this.el.preload = 'auto'; this.el.volume = 0; }catch(e){}
+    }
+  },
+  arm(){ if (this.armed) return; this.armed = true; this.apply(); },
+  setWant(k){ this.want = k; this.apply(); },
+  apply(){
+    if (!this.armed) return;
+    this.ensure();
+    if (!this.el) return;
+    const target = this.on ? this.want : null;
+    if (target === this.cur && (target === null || !this.el.paused)){
+      if (target) this.fade(this.vol);
+      return;
+    }
+    const doSwitch = ()=>{
+      this.cur = target;
+      if (!target){ try{ this.el.pause(); }catch(e){} return; }
+      const src = this.files[target];
+      if (!src){ try{ this.el.pause(); }catch(e){} return; }
+      try{
+        this.el.src = src;
+        this.el.currentTime = 0;
+        this.el.volume = 0;
+        const p = this.el.play();
+        if (p && p.then) p.then(()=>this.fade(this.vol)).catch(()=>{});
+      }catch(e){}
+    };
+    if (this.el && !this.el.paused && this.cur){ this.fade(0, doSwitch); }
+    else doSwitch();
+  },
+  fade(to, done){
+    clearInterval(this._fade);
+    if (!this.el) return;
+    this._fade = setInterval(()=>{
+      if (!this.el){ clearInterval(this._fade); return; }
+      const v = this.el.volume, d = to - v;
+      if (Math.abs(d) < 0.05){
+        try{ this.el.volume = Math.max(0, Math.min(1, to)); }catch(e){}
+        clearInterval(this._fade);
+        if (done) done();
+        return;
+      }
+      try{ this.el.volume = Math.max(0, Math.min(1, v + d * 0.25)); }catch(e){}
+    }, 40);
+  },
+};
+function desiredBgm(){
+  if (SCREEN === 'battle' && G){
+    if (G.over) return null;
+    if (G.online) return 'online';
+    const op = CPU_OPPONENTS[G.opIdx];
+    const k = op ? op.key : null;
+    if (k === 'daiki' || k === 'hiro' || k === 'takuya') return k;
+    return null; /* HIROKIは曲なし */
+  }
+  if (SCREEN === 'gacha') return 'gacha';
+  if (SCREEN === 'battle') return null;
+  return 'menu';
+}
+function updateBgm(){ BGM.setWant(desiredBgm()); }
+
+window.addEventListener('pointerdown', ()=>{ AE.init(); BGM.arm(); }, {once:false});
 
 /* ===================== 演出ヘルパー ===================== */
 const app = document.getElementById('app');
@@ -889,7 +962,7 @@ function revealCards(title, cids){
 
 /* ===================== 画面ルーター ===================== */
 let SCREEN = 'title';
-function go(name){ SCREEN = name; render(); }
+function go(name){ SCREEN = name; render(); updateBgm(); }
 function render(){
   switch(SCREEN){
     case 'title': renderTitle(); break;
@@ -935,8 +1008,9 @@ function renderHome(){
     + '<button class="btn gold" data-act="go" data-to="gacha">🎴 ガチャ</button>'
     + '<button class="btn" data-act="go" data-to="collection">📖 コレクション</button>'
     + '<button class="btn" data-act="go" data-to="deck">🛠 デッキ編集</button>'
-    + '<div style="display:flex;gap:10px"><button class="btn small" style="flex:1" data-act="toggle-sound">'+(S.sound!==false?'🔊 サウンドON':'🔇 サウンドOFF')+'</button>'
-    + '<button class="btn small danger" style="flex:1" data-act="reset-data">データ初期化</button></div>'
+    + '<div style="display:flex;gap:10px"><button class="btn small" style="flex:1" data-act="toggle-sound">'+(S.sound!==false?'🔊 効果音ON':'🔇 効果音OFF')+'</button>'
+    + '<button class="btn small" style="flex:1" data-act="toggle-bgm">'+(S.bgm!==false?'🎵 BGM ON':'🔕 BGM OFF')+'</button></div>'
+    + '<button class="btn small danger block" data-act="reset-data">データ初期化</button>'
     + '</div><div style="font-size:10px;color:var(--text-muted);letter-spacing:.2em">ZILCH CARD ONLINE v2.0</div></div></div>';
 }
 /* ===================== ガチャ画面 ===================== */
@@ -2278,6 +2352,7 @@ async function endDuel(winner, reason){
   if (!G || G.over) return;
   G.over = true;
   renderBattle();
+  updateBgm();
   await sleep(600);
   const win = winner === 'p1';
   const online = !!G.online;
@@ -2800,6 +2875,9 @@ app.addEventListener('click', async e=>{
     case 'toggle-sound':
       S.sound = S.sound === false; save(); AE.button(); render();
       break;
+    case 'toggle-bgm':
+      S.bgm = S.bgm === false; save(); AE.button(); BGM.apply(); render();
+      break;
     case 'reset-data': {
       const ok = await actionMenu('セーブデータを完全に消去しますか？', [{label:'消去する', value:true, cls:'danger'}]);
       if (ok){ localStorage.removeItem(SAVE_KEY); loadSave(); go('title'); toast('データを初期化しました'); }
@@ -3118,6 +3196,7 @@ async function guestPrompt(m){
 async function endDuelRemote(win, reason){
   if (G) G.over = true;
   if (SCREEN==='battle') renderBattle();
+  updateBgm();
   const reward = win ? 300 : 150;
   S.gems += reward;
   if (win) S.wins++; else S.losses++;

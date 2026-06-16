@@ -263,10 +263,17 @@ export class GameScene extends Phaser.Scene {
     car.x += car.vx * dt; car.y += car.vy * dt;
     // ドリフト角＝車体の向きと進行方向の差（氷上なので常に大きく出る）
     const vmag = Math.hypot(car.vx, car.vy) || 0.0001;
-    car.drift = Math.abs(P.angleDiff(car.angle, Math.atan2(car.vy, car.vx)));
+    const travel = Math.atan2(car.vy, car.vx);
+    let dsigned = P.angleDiff(car.angle, travel);
+    car.drift = Math.abs(dsigned);
+    // ★スピン防止＝持続ドリフト：車体の向きが進行方向から離れすぎたら緩く戻す。
+    // これにより「一度切ると車体が流れたまま滑り続ける」滑らかなドリフトになる。
+    const md = cfg.maxDrift || 1.05;
+    if (car.drift > md && vmag > 40) {
+      car.angle -= Math.sign(dsigned) * (car.drift - md) * 0.35;
+      car.drift = md;
+    }
     const isDrift = car.drift > cfg.driftThreshold && car.speed > cfg.maxSpeed * 0.18;
-    // 真横〜逆向きの過剰スピンは慣性を少し削る（完全制御不能を防ぐ）
-    if (car.drift > 1.4) { car.vx *= 0.97; car.vy *= 0.97; }
     // sprite
     this.sprite.setPosition(car.x, car.y);
     this.sprite.rotation = car.angle + Math.PI / 2;

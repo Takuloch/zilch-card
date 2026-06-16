@@ -28,11 +28,11 @@ export class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // 難易度セレクタ
-    this.add.text(cx, 178, '難易度', { fontFamily: 'sans-serif', fontSize: '12px', color: '#7fae7f' }).setOrigin(0.5);
+    this.add.text(cx, 166, '難易度', { fontFamily: 'sans-serif', fontSize: '12px', color: '#7fae7f' }).setOrigin(0.5);
     const diffs = [['easy', 'EASY'], ['normal', 'NORMAL'], ['hard', 'HARD']];
     this.diffBtns = [];
     diffs.forEach((d, i) => {
-      const b = button(this, 70 + i * 125, 208, 116, 38, d[1], {
+      const b = button(this, 70 + i * 125, 194, 116, 36, d[1], {
         fontSize: 15,
         onClick: () => { unlock(); SE.select(); this.diff = d[0]; this.refreshDiff(); },
       });
@@ -41,22 +41,23 @@ export class TitleScene extends Phaser.Scene {
     this.refreshDiff();
 
     // コースボタン
-    this.add.text(cx, 256, 'コースを選択', { fontFamily: 'sans-serif', fontSize: '12px', color: '#7fae7f' }).setOrigin(0.5);
+    this.add.text(cx, 234, 'コースを選択', { fontFamily: 'sans-serif', fontSize: '12px', color: '#7fae7f' }).setOrigin(0.5);
     COURSES.forEach((co, i) => {
       const best = getBest(co.id);
-      const sub = '難易度:' + co.difficulty.toUpperCase() + '  BEST ' + fmtTime(best ? best.bestTimeMs : null) + (best && best.noHitClear ? '  ★NO HIT' : '');
-      button(this, cx, 300 + i * 84, 340, 70, co.name, {
-        sub, fontSize: 20, fill: i === 0 ? 0x1c4a2c : 0x16321f,
+      const sub = co.difficulty.toUpperCase() + '  BEST ' + fmtTime(best ? best.bestTimeMs : null) + (best && best.noHitClear ? '  ★NO HIT' : '');
+      button(this, cx, 274 + i * 66, 344, 56, co.name, {
+        sub, fontSize: 18, fill: i === 0 ? 0x1c4a2c : 0x16321f,
         onClick: () => { unlock(); SE.select(); this.startCourse(co.id); },
       });
     });
 
     // 下部ボタン
-    button(this, cx - 88, 572, 160, 48, '⚙ 設定', { fontSize: 16, onClick: () => { unlock(); SE.select(); this.showSettings(); } });
-    button(this, cx + 88, 572, 160, 48, '🏆 記録', { fontSize: 16, onClick: () => { unlock(); SE.select(); this.showRecords(); } });
-    button(this, cx, 632, 340, 46, '← カードゲームに戻る', { fontSize: 15, fill: 0x10241a, onClick: () => { location.href = '../index.html'; } });
+    const by = 274 + COURSES.length * 66 + 8;
+    button(this, cx - 88, by, 160, 46, '⚙ 設定', { fontSize: 16, onClick: () => { unlock(); SE.select(); this.showSettings(); } });
+    button(this, cx + 88, by, 160, 46, '🏆 記録', { fontSize: 16, onClick: () => { unlock(); SE.select(); this.showRecords(); } });
+    button(this, cx, by + 56, 344, 44, '← カードゲームに戻る', { fontSize: 15, fill: 0x10241a, onClick: () => { location.href = '../index.html'; } });
 
-    this.add.text(cx, GAME_H - 24, '画面の左半分=左 / 右半分=右 ・ 加速は自動', {
+    this.add.text(cx, GAME_H - 16, '画面の左半分=左 / 右半分=右 ・ 加速は自動', {
       fontFamily: 'sans-serif', fontSize: '11px', color: '#5f7f5f',
     }).setOrigin(0.5);
   }

@@ -293,11 +293,11 @@ hr.sep{border:none; border-top:1px solid var(--border-accent); margin:10px 0;}
    1ファイル完結 / localStorage保存 / Web Audio API効果音
    ===================================================================== */
 const RARITY_CONFIG = {
-  N : {label:'ノーマル',   color:'var(--rarity-N)',  hex:'#6b7280', w:60},
-  R : {label:'レア',       color:'var(--rarity-R)',  hex:'#3b82f6', w:28},
-  SR: {label:'スーパーレア', color:'var(--rarity-SR)', hex:'#a855f7', w:8},
-  UR: {label:'ウルトラレア', color:'var(--rarity-UR)', hex:'#f59e0b', w:3},
-  ZR: {label:'ZILCHレア',  color:'var(--rarity-ZR)', hex:'#ec4899', w:1},
+  N : {label:'ノーマル',   color:'var(--rarity-N)',  hex:'#6b7280', w:72},
+  R : {label:'レア',       color:'var(--rarity-R)',  hex:'#3b82f6', w:22},
+  SR: {label:'スーパーレア', color:'var(--rarity-SR)', hex:'#a855f7', w:4.3},
+  UR: {label:'ウルトラレア', color:'var(--rarity-UR)', hex:'#f59e0b', w:1.2},
+  ZR: {label:'ZILCHレア',  color:'var(--rarity-ZR)', hex:'#ec4899', w:0.5},
 };
 const ATTR_LABEL = {dark:'闇', fire:'炎', light:'光', water:'水', earth:'地'};
 const SUB_LABEL = {normal:'通常魔法', quick:'速攻魔法', field:'フィールド魔法', equip:'装備魔法', continuous:'永続魔法',
@@ -1362,7 +1362,7 @@ function renderGacha(){
     + '<div class="scroll-y"><div class="center-col" id="gacha-area" style="justify-content:flex-start;padding-top:28px">'
     + '<div class="pack"><div class="plogo">Z</div><div style="font-size:11px;color:var(--text-secondary);letter-spacing:.2em">ZILCH PACK</div><div style="font-size:10px;color:var(--text-muted)">5枚入り</div></div>'
     + '<button class="btn gold" style="width:min(280px,80vw)" data-act="gacha-pull" '+(S.gems<GACHA_COST?'disabled':'')+'>パック開封（'+GACHA_COST+'G）</button>'
-    + '<div class="stat-line">N 60% ／ R 28% ／ SR 8% ／ UR 3% ／ ZR 1%</div>'
+    + '<div class="stat-line">N 72% ／ R 22% ／ SR 4.3% ／ UR 1.2% ／ ZR 0.5%</div>'
     + '</div></div></div>';
 }
 function rollRarity(){

@@ -39,11 +39,11 @@ export class GameScene extends Phaser.Scene {
     this.sprite = this.add.image(sp.x, sp.y, 'car').setDepth(10);
     this.sprite.rotation = this.car.angle + Math.PI / 2;
 
-    // カメラ追従
-    const zoom = Phaser.Math.Clamp(GAME_H / 1000, 0.85, 1.1);
+    // カメラ追従（先のコーナーが見えるよう少し引き＆先読み）
+    const zoom = Phaser.Math.Clamp(GAME_H / 1180, 0.72, 0.95);
     this.cameras.main.setZoom(zoom);
-    this.cameras.main.startFollow(this.sprite, true, 0.16, 0.16);
-    this.lookahead = 120;
+    this.cameras.main.startFollow(this.sprite, true, 0.14, 0.14);
+    this.lookahead = 170;
 
     this.buildHUD();
     this.setupInput();
@@ -247,9 +247,15 @@ export class GameScene extends Phaser.Scene {
     const turnRate = car.steer * cfg.steerStrength * (car.speed / cfg.maxSpeed);
     car.angle += turnRate * dt;
     // velocity blend toward heading
+    // 無操作時：進行方向へ緩く整える（counter-steerアシスト＝直線でスピンし続けない）
+    if (inS === 0 && (Math.hypot(car.vx, car.vy) > 30)) {
+      const travel = Math.atan2(car.vy, car.vx);
+      car.angle += P.angleDiff(travel, car.angle) * (cfg.alignAssist || 0.045);
+    }
     const fwd = P.vecFromAngle(car.angle);
     const desired = { x: fwd.x * car.speed, y: fwd.y * car.speed };
-    const driftNow = car.drift > cfg.driftThreshold && car.speed > cfg.maxSpeed * 0.35;
+    // 常時低グリップ＝常にスライド。深いドリフト中はさらに滑る。
+    const driftNow = car.drift > cfg.driftThreshold && car.speed > cfg.maxSpeed * 0.25;
     const grip = driftNow ? cfg.driftGrip : cfg.baseGrip;
     const k = Math.min(1, grip * dt * 8);
     car.vx = P.lerp(car.vx, desired.x, k);
@@ -259,9 +265,9 @@ export class GameScene extends Phaser.Scene {
     // drift angle
     const vmag = Math.hypot(car.vx, car.vy) || 0.0001;
     car.drift = Math.abs(P.angleDiff(car.angle, Math.atan2(car.vy, car.vx)));
-    const isDrift = car.drift > cfg.driftThreshold && car.speed > cfg.maxSpeed * 0.35;
-    // drift over-rotation slows
-    if (car.drift > 1.0) car.speed *= 0.99;
+    const isDrift = car.drift > cfg.driftThreshold && car.speed > cfg.maxSpeed * 0.25;
+    // 過度な横滑りは速度を少し削る（壁に刺さりやすくしすぎない）
+    if (car.drift > 1.2) car.speed *= 0.985;
     // sprite
     this.sprite.setPosition(car.x, car.y);
     this.sprite.rotation = car.angle + Math.PI / 2;

@@ -1,6 +1,6 @@
 // sw.js — DRIFT PASS service worker
 // HTML/コードはネット優先（更新を確実に取得）、その他はキャッシュ優先。オフライン対応。
-const CACHE = 'driftpass-v1';
+const CACHE = 'driftpass-v2';
 const ASSETS = [
   './', './index.html', './phaser.min.js',
   './manifest.webmanifest',

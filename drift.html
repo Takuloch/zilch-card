@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ZILCH DRIFT">
+<meta name="theme-color" content="#0a160a">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>ZILCH DRIFT — IniD</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+html,body{height:100%;overflow:hidden;background:#0a160a;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;color:#e8ffe8;position:fixed;inset:0;touch-action:none;}
+#wrap{position:fixed;inset:0;display:flex;flex-direction:column;}
+canvas{display:block;width:100%;height:100%;background:#0c1810;touch-action:none;}
+.hud{position:fixed;top:env(safe-area-inset-top);left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:10px 14px;pointer-events:none;font-variant-numeric:tabular-nums;z-index:5;}
+.hud .blk{background:rgba(0,0,0,.45);border:1px solid rgba(120,220,120,.4);border-radius:8px;padding:5px 10px;}
+.hud .lbl{font-size:9px;letter-spacing:.2em;color:#9fd99f;}
+.hud .val{font-size:19px;font-weight:800;}
+.hud .val.best{color:#ffd23f;}
+.center-msg{position:fixed;left:0;right:0;top:38%;text-align:center;font-size:34px;font-weight:900;letter-spacing:.1em;z-index:6;
+  text-shadow:0 0 18px rgba(80,255,120,.6),0 3px 6px #000;pointer-events:none;}
+.drift-meter{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));text-align:center;z-index:5;pointer-events:none;}
+.drift-meter .dval{font-size:15px;font-weight:800;color:#ffd23f;text-shadow:0 0 12px rgba(255,180,0,.7),0 2px 4px #000;opacity:0;transition:opacity .2s;}
+.drift-meter .dval.on{opacity:1;}
+/* screens */
+.screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;
+  background:radial-gradient(circle at 50% 30%,#13241a,#070f0a 75%);overflow-y:auto;}
+.logo{font-size:40px;font-weight:900;letter-spacing:.1em;line-height:1;text-align:center;
+  background:linear-gradient(135deg,#7CFC7C,#22c55e 55%,#a3e635);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 16px rgba(80,255,120,.45));}
+.logo small{display:block;font-size:11px;letter-spacing:.45em;color:#9fd99f;-webkit-text-fill-color:#9fd99f;margin-top:8px;filter:none;}
+.sub{font-size:12px;color:#9fd99f;text-align:center;line-height:1.7;}
+.btn{display:flex;flex-direction:column;align-items:center;gap:3px;width:min(320px,86vw);padding:14px 18px;border-radius:13px;font-weight:800;font-size:17px;
+  border:1px solid rgba(120,220,120,.5);color:#eaffea;background:linear-gradient(180deg,#16321f,#0c1c12);cursor:pointer;transition:transform .12s;}
+.btn:active{transform:scale(.96);}
+.btn.primary{background:linear-gradient(135deg,#22c55e,#15803d);border-color:#86efac;color:#04210f;box-shadow:0 4px 18px rgba(34,197,94,.35);}
+.btn .meta{font-size:11px;font-weight:600;opacity:.85;}
+.btn .best{font-size:11px;color:#ffd23f;font-weight:700;}
+.diff{font-size:11px;letter-spacing:.05em;}
+.controls-hint{display:flex;gap:18px;justify-content:center;margin-top:6px;}
+.hint-box{font-size:11px;color:#9fd99f;text-align:center;border:1px dashed rgba(120,220,120,.35);border-radius:10px;padding:8px 12px;}
+.result-time{font-size:46px;font-weight:900;color:#fff;text-shadow:0 0 18px rgba(80,255,120,.6);}
+.result-sub{font-size:13px;color:#9fd99f;}
+.perfect{color:#ffd23f;font-weight:900;font-size:20px;letter-spacing:.1em;text-shadow:0 0 16px rgba(255,200,0,.7);animation:pulse 1s infinite;}
+.secret{font-size:13px;color:#ffd23f;line-height:1.8;border:1px solid rgba(255,210,60,.5);border-radius:12px;padding:12px 16px;background:rgba(255,210,60,.08);text-align:center;}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+.hidden{display:none!important;}
+.toprow{position:fixed;top:env(safe-area-inset-top);right:10px;z-index:11;}
+.xbtn{background:rgba(0,0,0,.5);border:1px solid rgba(120,220,120,.4);color:#cfeccf;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:700;}
+.cdcount{font-size:90px;font-weight:900;color:#fff;text-shadow:0 0 24px rgba(80,255,120,.7),0 4px 8px #000;}
+.touch-zones{position:fixed;inset:0;z-index:4;display:flex;pointer-events:none;}
+.tz{flex:1;display:flex;align-items:center;justify-content:center;font-size:46px;opacity:0;transition:opacity .12s;}
+.tz.on{opacity:.16;}
+.tz.left{background:linear-gradient(90deg,rgba(120,220,120,.5),transparent);}
+.tz.right{background:linear-gradient(270deg,rgba(120,220,120,.5),transparent);}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+</div>
+<div class="touch-zones" id="tzwrap"><div class="tz left" id="tzL">◀</div><div class="tz right" id="tzR">▶</div></div>
+<div class="hud hidden" id="hud">
+  <div class="blk"><div class="lbl">TIME</div><div class="val" id="hTime">0.000</div></div>
+  <div class="blk" style="text-align:center"><div class="lbl">COURSE</div><div class="val" id="hCourse" style="font-size:14px">-</div></div>
+  <div class="blk" style="text-align:right"><div class="lbl">BEST</div><div class="val best" id="hBest">--</div></div>
+</div>
+<div class="drift-meter hidden" id="dm"><div class="dval" id="dmv">DRIFT!</div></div>
+<div class="center-msg hidden" id="cmsg"></div>
+<div class="toprow hidden" id="toprow"><button class="xbtn" id="quitBtn">やめる</button></div>
+
+<!-- タイトル -->
+<div class="screen" id="menu">
+  <div class="logo">ZILCH DRIFT<small>I n i D ・ 見下ろしドリフト</small></div>
+  <div class="sub">画面の左半分タッチ＝左、右半分タッチ＝右<br>加速は自動。ドリフトでコーナーを駆け抜けろ。<br>壁に当たらずゴールすると…隠し要素？</div>
+  <div id="courseBtns" style="display:flex;flex-direction:column;gap:11px;width:100%;align-items:center;"></div>
+  <button class="btn" id="backToCards" style="margin-top:4px">← カードゲームに戻る</button>
+</div>
+
+<!-- リザルト -->
+<div class="screen hidden" id="result">
+  <div class="logo" id="rTitle" style="font-size:30px">GOAL!</div>
+  <div class="result-time" id="rTime">0.000</div>
+  <div class="result-sub" id="rBest"></div>
+  <div id="rPerfect"></div>
+  <div id="rSecret"></div>
+  <button class="btn primary" id="rRetry">もう一度</button>
+  <button class="btn" id="rMenu">コース選択へ</button>
+</div>
+
+<script>
+'use strict';
+const SAVE_KEY = 'zilch_drift_best_v1';
+function loadBest(){ try{ return JSON.parse(localStorage.getItem(SAVE_KEY))||{}; }catch(e){ return {}; } }
+function saveBest(b){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(b)); }catch(e){} }
+let BEST = loadBest();
+function fmt(ms){ if(ms==null) return '--'; const s=ms/1000; return s.toFixed(3); }
+
+/* ---------- コース生成 ---------- */
+/* segs: [曲がり角度(度/ステップ), ステップ数] の並び。straight=0 */
+function buildCourse(segs, step){
+  let x=0,y=0,a=0; const pts=[{x,y}];
+  for(const [deg,count] of segs){
+    const dr=deg*Math.PI/180;
+    for(let i=0;i<count;i++){ a+=dr; x+=Math.sin(a)*step; y-=Math.cos(a)*step; pts.push({x:Math.round(x),y:Math.round(y)}); }
+  }
+  return pts;
+}
+const COURSES = [
+  { key:'beginner', name:'初級：秋名ヒルクライム', diff:'★☆☆', width:78, color:'#3a6e3a',
+    pts: buildCourse([[0,7],[2.2,16],[0,5],[-2.2,16],[0,6],[1.6,22],[0,5],[-1.8,18],[0,9]], 46) },
+  { key:'medium', name:'中級：妙義ナイトラン', diff:'★★☆', width:60, color:'#6e5a2a',
+    pts: buildCourse([[0,6],[4,12],[0,3],[-4,12],[0,4],[5,11],[-5,11],[0,4],[3,16],[0,4],[-6,10],[0,8]], 44) },
+  { key:'expert', name:'上級：いろは坂デスマッチ', diff:'★★★', width:48, color:'#6e2a2a',
+    pts: buildCourse([[0,5],[7,12],[-7,12],[0,3],[8,10],[-8,11],[0,3],[6,13],[-6,13],[0,3],[9,9],[-9,9],[0,3],[5,14],[0,7]], 42) },
+];
+
+/* ---------- Audio（簡易エンジン音＋SE） ---------- */
+const AU = { ctx:null, eng:null, engGain:null,
+  init(){ if(this.ctx) { if(this.ctx.state==='suspended')this.ctx.resume(); return; }
+    try{ this.ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; } },
+  startEngine(){ if(!this.ctx||this.eng) return;
+    const o=this.ctx.createOscillator(), g=this.ctx.createGain(), f=this.ctx.createBiquadFilter();
+    o.type='sawtooth'; o.frequency.value=70; f.type='lowpass'; f.frequency.value=600; g.gain.value=0.05;
+    o.connect(f); f.connect(g); g.connect(this.ctx.destination); o.start(); this.eng=o; this.engGain=g; this.engF=f; },
+  setRpm(t){ if(this.eng){ this.eng.frequency.value=60+t*150; this.engF.frequency.value=500+t*1400; } },
+  stopEngine(){ if(this.eng){ try{this.eng.stop();}catch(e){} this.eng=null; } },
+  skid(on){ if(!this.ctx) return;
+    if(on && !this.sk){ const b=this.ctx.createBufferSource(); const len=this.ctx.sampleRate*0.4; const buf=this.ctx.createBuffer(1,len,this.ctx.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*0.3; buf.loopStart=0; b.buffer=buf; b.loop=true; const g=this.ctx.createGain(); g.gain.value=0.06; const fl=this.ctx.createBiquadFilter(); fl.type='bandpass'; fl.frequency.value=2200; b.connect(fl); fl.connect(g); g.connect(this.ctx.destination); b.start(); this.sk=b; }
+    else if(!on && this.sk){ try{this.sk.stop();}catch(e){} this.sk=null; } },
+  beep(freq,dur,vol){ if(!this.ctx)return; const o=this.ctx.createOscillator(),g=this.ctx.createGain(); o.type='triangle'; o.frequency.value=freq; g.gain.value=vol||0.12; o.connect(g); g.connect(this.ctx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,this.ctx.currentTime+(dur||0.2)); o.stop(this.ctx.currentTime+(dur||0.2)+0.05); },
+  crash(){ if(!this.ctx)return; const len=this.ctx.sampleRate*0.3; const buf=this.ctx.createBuffer(1,len,this.ctx.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*(1-i/len); const b=this.ctx.createBufferSource(); b.buffer=buf; const g=this.ctx.createGain(); g.gain.value=0.25; const fl=this.ctx.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=900; b.connect(fl); fl.connect(g); g.connect(this.ctx.destination); b.start(); this.beep(90,0.18,0.18); },
+  fanfare(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>this.beep(f,0.25,0.13),i*120)); },
+};
+
+/* ---------- ゲーム状態 ---------- */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+let DPR=Math.min(window.devicePixelRatio||1,2), W=0,H=0;
+function resize(){ W=window.innerWidth; H=window.innerHeight; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+'px'; cv.style.height=H+'px'; ctx.setTransform(DPR,0,0,DPR,0,0); }
+window.addEventListener('resize',resize); resize();
+
+let state='menu';   // menu / countdown / play / result
+let course=null, car=null, startMs=0, elapMs=0, lastT=0, raf=0;
+let input={l:false,r:false}, touched=false;
+let smoke=[], clean=true, countdown=0;
+
+function resetCar(c){
+  const p0=c.pts[0], p1=c.pts[1];
+  const a=Math.atan2(p1.x-p0.x, -(p1.y-p0.y));
+  car={ x:p0.x, y:p0.y, angle:a, vx:0, vy:0, speed:0, seg:0, drift:0, off:false, finished:false };
+}
+function startCourse(idx){
+  course=COURSES[idx];
+  resetCar(course);
+  clean=true; smoke=[]; elapMs=0;
+  document.getElementById('hCourse').textContent=course.name.split('：')[0];
+  document.getElementById('hBest').textContent=fmt(BEST[course.key]);
+  show('hud',true); show('dm',true); show('toprow',true);
+  show('menu',false); show('result',false);
+  AU.init(); AU.startEngine();
+  state='countdown'; countdown=3; cmsgShow('3');
+  AU.beep(440,0.2);
+  let cd=3;
+  const ti=setInterval(()=>{ cd--; if(cd>0){ cmsgShow(String(cd)); AU.beep(440,0.2);} else if(cd===0){ cmsgShow('GO!'); AU.beep(880,0.4);} else { clearInterval(ti); cmsgHide(); state='play'; startMs=performance.now(); } }, 800);
+  lastT=performance.now();
+  cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
+}
+function cmsgShow(t){ const e=document.getElementById('cmsg'); e.textContent=t; e.classList.remove('hidden'); }
+function cmsgHide(){ document.getElementById('cmsg').classList.add('hidden'); }
+function show(id,on){ document.getElementById(id).classList.toggle('hidden',!on); }
+
+/* ---------- 物理 ---------- */
+function nearestSeg(c, x, y, fromSeg){
+  let best=fromSeg, bd=Infinity, bproj=0;
+  const lo=Math.max(0,fromSeg-2), hi=Math.min(c.pts.length-2, fromSeg+6);
+  for(let i=lo;i<=hi;i++){
+    const a=c.pts[i], b=c.pts[i+1];
+    const dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy||1;
+    let t=((x-a.x)*dx+(y-a.y)*dy)/L2; t=Math.max(0,Math.min(1,t));
+    const px=a.x+dx*t, py=a.y+dy*t;
+    const d=(x-px)*(x-px)+(y-py)*(y-py);
+    if(d<bd){ bd=d; best=i; bproj=t; }
+  }
+  return {seg:best, dist:Math.sqrt(bd), t:bproj};
+}
+function step(dt){
+  const c=course, car_=car;
+  // steering
+  let steer=0; if(input.l)steer-=1; if(input.r)steer+=1;
+  // auto accel
+  const MAXS = c.width>=70?5.6 : c.width>=55?5.3 : 5.0;
+  const targetSpeed = car_.off ? MAXS*0.45 : MAXS;
+  car_.speed += (targetSpeed - car_.speed)*0.04;
+  // turn rate scales a bit with speed
+  const turn = steer * 0.052 * Math.min(1, car_.speed/3+0.3);
+  car_.angle += turn;
+  // heading vector (up = -y)
+  const hx=Math.sin(car_.angle), hy=-Math.cos(car_.angle);
+  // grip: lower when steering hard & fast → drift
+  const steerMag=Math.abs(steer);
+  const grip = car_.off ? 0.18 : (0.16 - steerMag*0.085);
+  // desired velocity = heading*speed; blend
+  const dvx=hx*car_.speed, dvy=hy*car_.speed;
+  car_.vx += (dvx-car_.vx)*grip;
+  car_.vy += (dvy-car_.vy)*grip;
+  // drift amount = angle between velocity and heading
+  const vmag=Math.hypot(car_.vx,car_.vy)||0.0001;
+  const dot=(car_.vx*hx+car_.vy*hy)/vmag;
+  car_.drift=Math.max(0,1-dot)*Math.min(1,vmag/3);
+  // move
+  car_.x+=car_.vx; car_.y+=car_.vy;
+  // track follow / off-track
+  const ns=nearestSeg(c, car_.x, car_.y, car_.seg);
+  if(ns.seg>=car_.seg) car_.seg=ns.seg;
+  const wasOff=car_.off;
+  car_.off = ns.dist > c.width;
+  if(car_.off){
+    clean=false;
+    if(!wasOff){ AU.crash(); flashOff(); }
+    // push back toward track + slow
+    const a=c.pts[car_.seg], b=c.pts[car_.seg+1];
+    const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+    const px=a.x+dx*ns.t, py=a.y+dy*ns.t;
+    const toCx=(px-car_.x), toCy=(py-car_.y), tl=Math.hypot(toCx,toCy)||1;
+    car_.x += toCx/tl*3.2; car_.y += toCy/tl*3.2;
+    car_.vx*=0.86; car_.vy*=0.86;
+  }
+  // smoke when drifting
+  if(car_.drift>0.35 && car_.speed>2){
+    smoke.push({x:car_.x - hx*9, y:car_.y - hy*9, life:1, r:5+Math.random()*4});
+    smoke.push({x:car_.x - hx*9 + (Math.random()*8-4), y:car_.y - hy*9+(Math.random()*8-4), life:1, r:4+Math.random()*4});
+  }
+  for(const s of smoke){ s.life-=0.035; s.r+=0.5; }
+  smoke=smoke.filter(s=>s.life>0);
+  if(smoke.length>140) smoke.splice(0, smoke.length-140);
+  // engine sound + skid
+  AU.setRpm(Math.min(1,car_.speed/MAXS));
+  AU.skid(car_.drift>0.4 && car_.speed>2);
+  // drift meter
+  const dmv=document.getElementById('dmv');
+  dmv.classList.toggle('on', car_.drift>0.4 && car_.speed>2);
+  dmv.textContent = car_.drift>0.7 ? 'BIG DRIFT!!' : 'DRIFT!';
+  // goal?
+  if(car_.seg >= c.pts.length-2){
+    const last=c.pts[c.pts.length-1];
+    if(Math.hypot(car_.x-last.x, car_.y-last.y) < c.width*1.2) finish();
+  }
+}
+let offFlash=0;
+function flashOff(){ offFlash=1; }
+
+/* ---------- 描画 ---------- */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // bg
+  ctx.fillStyle='#0c1810'; ctx.fillRect(0,0,W,H);
+  const camY=H*0.62;
+  ctx.save();
+  ctx.translate(W/2, camY);
+  ctx.rotate(-car.angle);
+  ctx.translate(-car.x, -car.y);
+  const c=course;
+  // track body
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  ctx.strokeStyle='#1c2c1c'; ctx.lineWidth=c.width*2+14;
+  pathLine(c.pts); ctx.stroke();
+  ctx.strokeStyle='#26331f'; ctx.lineWidth=c.width*2;
+  ctx.stroke();
+  // center dashes
+  ctx.strokeStyle='rgba(220,220,150,.5)'; ctx.lineWidth=3; ctx.setLineDash([18,22]);
+  pathLine(c.pts); ctx.stroke(); ctx.setLineDash([]);
+  // edges
+  drawEdges(c);
+  // start / finish lines
+  checker(c.pts[0], c.pts[1], c.width, '#ffffff');
+  checker(c.pts[c.pts.length-1], c.pts[c.pts.length-2], c.width, '#ffd23f');
+  // smoke
+  for(const s of smoke){ ctx.globalAlpha=s.life*0.5; ctx.fillStyle='#dfeede'; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,7); ctx.fill(); }
+  ctx.globalAlpha=1;
+  ctx.restore();
+  // car (fixed, pointing up)
+  drawCar(W/2, camY);
+  // off-track vignette
+  if(offFlash>0){ ctx.fillStyle='rgba(220,40,40,'+(offFlash*0.28)+')'; ctx.fillRect(0,0,W,H); offFlash-=0.06; }
+}
+function pathLine(pts){ ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y); }
+function drawEdges(c){
+  // approximate edges by offsetting normals
+  ctx.lineWidth=4;
+  for(let side=-1;side<=1;side+=2){
+    ctx.strokeStyle = side<0? '#d23a3a':'#e8e8e8';
+    ctx.beginPath();
+    for(let i=0;i<c.pts.length-1;i++){
+      const a=c.pts[i], b=c.pts[i+1]; const dx=b.x-a.x, dy=b.y-a.y, L=Math.hypot(dx,dy)||1;
+      const nx=-dy/L*side*c.width, ny=dx/L*side*c.width;
+      if(i===0)ctx.moveTo(a.x+nx,a.y+ny); ctx.lineTo(b.x+nx,b.y+ny);
+    }
+    ctx.stroke();
+  }
+}
+function checker(p,p2,w,col){
+  const dx=p.x-p2.x, dy=p.y-p2.y, L=Math.hypot(dx,dy)||1;
+  const nx=-dy/L, ny=dx/L;
+  ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(Math.atan2(dy,dx)+Math.PI/2);
+  const n=8, cw=(w*2)/n;
+  for(let i=0;i<n;i++){ ctx.fillStyle=(i%2)?col:'#222'; ctx.fillRect(-w+i*cw,-6,cw,12); }
+  ctx.restore();
+}
+function drawCar(cx,cy){
+  ctx.save(); ctx.translate(cx,cy);
+  // drift tilt
+  const tilt = Math.max(-0.4,Math.min(0.4, (input.r?1:0)-(input.l?1:0))*car.drift*0.6);
+  ctx.rotate(tilt);
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.4)'; ctx.fillRect(-11,-16,22,34);
+  // body
+  const grad=ctx.createLinearGradient(0,-18,0,18); grad.addColorStop(0,'#e0e0e0'); grad.addColorStop(.5,'#9aa'); grad.addColorStop(1,'#556');
+  ctx.fillStyle=grad; roundRect(-10,-17,20,34,5); ctx.fill();
+  ctx.fillStyle='#1a2a3a'; roundRect(-8,-9,16,13,3); ctx.fill();   // windshield
+  ctx.fillStyle='#c00'; ctx.fillRect(-10,15,20,3);                  // tail
+  ctx.fillStyle='#fff'; ctx.fillRect(-9,-18,5,3); ctx.fillRect(4,-18,5,3); // headlights
+  ctx.restore();
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+/* ---------- ループ ---------- */
+function loop(t){
+  const dt=Math.min(50,t-lastT)/16.67; lastT=t;
+  if(state==='play'){
+    step(dt);
+    elapMs=performance.now()-startMs;
+    document.getElementById('hTime').textContent=fmt(elapMs);
+  } else if(state==='countdown'){
+    // idle render
+  }
+  if(state==='play'||state==='countdown') draw();
+  if(state==='play'||state==='countdown') raf=requestAnimationFrame(loop);
+}
+
+/* ---------- ゴール ---------- */
+function finish(){
+  if(car.finished) return; car.finished=true;
+  state='result';
+  AU.stopEngine(); AU.skid(false);
+  cancelAnimationFrame(raf);
+  const ms=elapMs;
+  const prev=BEST[course.key];
+  const isBest = (prev==null || ms<prev);
+  if(isBest){ BEST[course.key]=Math.round(ms); saveBest(BEST); }
+  AU.fanfare();
+  document.getElementById('rTitle').textContent= clean ? 'PERFECT GOAL!' : 'GOAL!';
+  document.getElementById('rTime').textContent=fmt(ms);
+  document.getElementById('rBest').textContent = isBest ? '★ ベスト更新！' : ('ベスト: '+fmt(prev));
+  document.getElementById('rPerfect').innerHTML = clean ? '<div class="perfect">ノーダメージ走破！</div>' : '';
+  // 隠し要素：ノーミス＋一定タイム以内
+  const sec=document.getElementById('rSecret');
+  if(clean){
+    const code = 'ZILCH-'+course.key.toUpperCase().slice(0,3)+'-'+String(Math.round(ms)).slice(-4);
+    sec.innerHTML = '<div class="secret">🏁 隠しコード解放！<br><b>'+code+'</b><br><span style="font-size:11px">壁に当たらず走破した者だけの称号だ</span></div>';
+    try{ const unlocked=JSON.parse(localStorage.getItem('zilch_drift_secrets')||'[]'); if(!unlocked.includes(course.key)){unlocked.push(course.key); localStorage.setItem('zilch_drift_secrets',JSON.stringify(unlocked));} }catch(e){}
+  } else { sec.innerHTML=''; }
+  show('hud',false); show('dm',false); show('toprow',false); show('result',true);
+}
+
+/* ---------- 入力 ---------- */
+const tzL=document.getElementById('tzL'), tzR=document.getElementById('tzR');
+function setInput(){ tzL.classList.toggle('on',input.l); tzR.classList.toggle('on',input.r); }
+function handle(e, down){
+  if(state!=='play' && state!=='countdown') return;
+  e.preventDefault();
+  input.l=input.r=false;
+  const touches = e.touches ? Array.from(e.touches) : [{clientX:e.clientX}];
+  if(!down && (!e.touches || e.touches.length===0)){ setInput(); return; }
+  for(const tch of touches){ if(tch.clientX < window.innerWidth/2) input.l=true; else input.r=true; }
+  setInput();
+}
+['touchstart','touchmove'].forEach(ev=>document.addEventListener(ev,e=>handle(e,true),{passive:false}));
+document.addEventListener('touchend',e=>handle(e,false),{passive:false});
+document.addEventListener('touchcancel',e=>handle(e,false),{passive:false});
+// マウス（PC確認用）
+let mdown=false;
+cv.addEventListener('mousedown',e=>{mdown=true;handle(e,true);});
+window.addEventListener('mousemove',e=>{if(mdown)handle(e,true);});
+window.addEventListener('mouseup',e=>{mdown=false;input.l=input.r=false;setInput();});
+// キーボード（PC）
+window.addEventListener('keydown',e=>{ if(e.key==='ArrowLeft')input.l=true; if(e.key==='ArrowRight')input.r=true; setInput(); });
+window.addEventListener('keyup',e=>{ if(e.key==='ArrowLeft')input.l=false; if(e.key==='ArrowRight')input.r=false; setInput(); });
+
+/* ---------- メニュー ---------- */
+function buildMenu(){
+  const wrap=document.getElementById('courseBtns'); wrap.innerHTML='';
+  COURSES.forEach((c,i)=>{
+    const b=document.createElement('button'); b.className='btn'+(i===0?' primary':'');
+    b.innerHTML='<span>'+c.name+'</span><span class="diff">難易度 '+c.diff+'</span><span class="best">BEST: '+fmt(BEST[c.key])+'</span>';
+    b.onclick=()=>{ AU.init(); startCourse(i); };
+    wrap.appendChild(b);
+  });
+}
+buildMenu();
+document.getElementById('quitBtn').onclick=()=>{ AU.stopEngine(); AU.skid(false); cancelAnimationFrame(raf); state='menu'; show('hud',false); show('dm',false); show('toprow',false); show('menu',true); buildMenu(); };
+document.getElementById('rRetry').onclick=()=>{ const i=COURSES.indexOf(course); startCourse(i); };
+document.getElementById('rMenu').onclick=()=>{ state='menu'; show('result',false); show('menu',true); buildMenu(); };
+document.getElementById('backToCards').onclick=()=>{ location.href='index.html'; };
+
+/* サービスワーカー（自動更新） */
+if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('sw.js').catch(function(){}); }catch(e){} }
+</script>
+</body>
+</html>

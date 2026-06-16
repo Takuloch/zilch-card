@@ -1,0 +1,18 @@
+{
+  "name": "drift-pass",
+  "version": "1.0.0",
+  "description": "DRIFT PASS — One touch. Full drift. 見下ろし型ドリフトタイムアタック (Phaser 3 / PWA)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .js"
+  },
+  "dependencies": {
+    "phaser": "3.80.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

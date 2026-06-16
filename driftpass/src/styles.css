@@ -1,0 +1,22 @@
+/* styles.css — フルスクリーン/スクロール禁止/Safe Area */
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{
+  height:100%;width:100%;overflow:hidden;background:#05070f;
+  overscroll-behavior:none;touch-action:none;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+  position:fixed;inset:0;
+  font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;
+}
+#game{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+#game canvas{display:block;touch-action:none;}
+/* Safe Area考慮：上部UIがノッチに隠れないようcanvasはFIT中央寄せ。
+   Phaser内部でUIは上8pxから配置しているが、念のため本文背景を黒に。 */
+#rotate{
+  display:none;position:fixed;inset:0;z-index:999;
+  align-items:center;justify-content:center;text-align:center;
+  background:#05070f;color:#7CFC7C;font-size:18px;font-weight:800;padding:24px;
+}
+@media (orientation:landscape) and (max-height:520px){
+  #rotate{display:flex;}
+}

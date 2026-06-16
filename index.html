@@ -1334,7 +1334,7 @@ function renderHome(){
     + '<button class="btn gold" data-act="go" data-to="gacha">🎴 ガチャ</button>'
     + '<button class="btn" data-act="go" data-to="collection">📖 コレクション</button>'
     + '<button class="btn" data-act="go" data-to="deck">🛠 デッキ編集</button>'
-    + '<button class="btn gold" data-act="minigame">🏁 ドリフト IniD（ミニゲーム）</button>'
+    + '<button class="btn gold" data-act="minigame">🏁 DRIFT PASS（ミニゲーム）</button>'
     + '<div style="display:flex;gap:10px"><button class="btn small" style="flex:1" data-act="toggle-sound">'+(S.sound!==false?'🔊 効果音ON':'🔇 効果音OFF')+'</button>'
     + '<button class="btn small" style="flex:1" data-act="toggle-bgm">'+(S.bgm!==false?'🎵 BGM ON':'🔕 BGM OFF')+'</button></div>'
     + '<button class="btn small block" data-act="save-manage" style="border-color:var(--accent-light)">💾 セーブのバックアップ / 復元</button>'
@@ -3356,7 +3356,7 @@ app.addEventListener('click', async e=>{
       break;
     }
     case 'go': AE.button(); go(d.to); break;
-    case 'minigame': AE.button(); location.href='drift.html'; break;
+    case 'minigame': AE.button(); location.href='driftpass/index.html'; break;
     case 'toggle-sound':
       S.sound = S.sound === false; save(); AE.button(); render();
       break;

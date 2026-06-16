@@ -20,7 +20,7 @@ export class TitleScene extends Phaser.Scene {
     this.clear();
     const cx = GAME_W / 2;
     // タイトル
-    this.add.text(cx, 92, 'DRIFT PASS', {
+    this.add.text(cx, 92, 'ZILCH DRIFT', {
       fontFamily: 'sans-serif', fontSize: '46px', color: '#7CFC7C', fontStyle: '900',
     }).setOrigin(0.5).setShadow(0, 0, '#22c55e', 18, true, true);
     this.add.text(cx, 132, 'One touch. Full drift.', {

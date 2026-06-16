@@ -620,6 +620,11 @@ function loadSave(){
   try{ S = JSON.parse(localStorage.getItem(SAVE_KEY)); }catch(e){ S = null; }
   if (!S || typeof S !== 'object' || !S.coll) S = defaultSave();
   if (!Array.isArray(S.deck)) S.deck = STARTER_DECK.slice();
+  /* ミニゲーム(ZILCH DRIFT)からの報酬ダイヤを回収 */
+  try{
+    const pend = parseInt(localStorage.getItem('zilch_pending_gems')||'0',10)||0;
+    if (pend > 0){ S.gems = (S.gems||0) + pend; localStorage.removeItem('zilch_pending_gems'); S.driftReward = (S.driftReward||0) + pend; save(); }
+  }catch(e){}
   /* v2移行：廃止カードをジェムに変換し、スターターを保証 */
   if ((S.ver||1) < 3){
     S.ver = 3;
@@ -1327,6 +1332,10 @@ function renderHome(){
     const g = S.gift; S.gift = 0; save();
     setTimeout(()=>toast('アップデート記念＆カード整理補償 💎'+g+' 獲得！'), 1300);
   }
+  if (S.driftReward){
+    const dr = S.driftReward; S.driftReward = 0; save();
+    setTimeout(()=>toast('🏁 ZILCH DRIFT報酬 💎'+dr+' を受け取った！'), 800);
+  }
   app.innerHTML =
     '<div class="screen"><div class="center-col" style="gap:18px">'
     + '<div class="logo" style="font-size:28px">ZILCH CARD<small>WELCOME BACK, '+esc(S.name.toUpperCase())+'</small></div>'
@@ -1337,7 +1346,7 @@ function renderHome(){
     + '<button class="btn gold" data-act="go" data-to="gacha">🎴 ガチャ</button>'
     + '<button class="btn" data-act="go" data-to="collection">📖 コレクション</button>'
     + '<button class="btn" data-act="go" data-to="deck">🛠 デッキ編集</button>'
-    + '<button class="btn gold" data-act="minigame">🏁 DRIFT PASS（ミニゲーム）</button>'
+    + '<button class="btn gold" data-act="minigame">🏁 ZILCH DRIFT（ミニゲーム）</button>'
     + '<div style="display:flex;gap:10px"><button class="btn small" style="flex:1" data-act="toggle-sound">'+(S.sound!==false?'🔊 効果音ON':'🔇 効果音OFF')+'</button>'
     + '<button class="btn small" style="flex:1" data-act="toggle-bgm">'+(S.bgm!==false?'🎵 BGM ON':'🔕 BGM OFF')+'</button></div>'
     + '<button class="btn small block" data-act="save-manage" style="border-color:var(--accent-light)">💾 セーブのバックアップ / 復元</button>'

@@ -48,6 +48,16 @@ export function resetAll() {
   try { localStorage.removeItem(KEY); } catch (e) {}
 }
 
+// カードゲームへ渡すダイヤ（同一オリジンのlocalStorageで連携）。
+// カードゲーム側がホーム表示時に zilch_pending_gems を回収してダイヤに加算する。
+export function grantGems(n) {
+  if (!(n > 0)) return;
+  try {
+    const cur = parseInt(localStorage.getItem('zilch_pending_gems') || '0', 10) || 0;
+    localStorage.setItem('zilch_pending_gems', String(cur + n));
+  } catch (e) {}
+}
+
 // 後からゴースト保存に使える簡易ストレージ（拡張用）
 export function saveGhost(courseId, frames) {
   const s = read();

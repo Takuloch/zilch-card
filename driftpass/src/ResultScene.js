@@ -1,6 +1,6 @@
 // ResultScene.js — リザルト表示・ベスト更新・ランク
 import { GAME_W, GAME_H } from './config.js';
-import { getBest, updateBest } from './storage.js';
+import { getBest, updateBest, grantGems } from './storage.js';
 import { button, fmtTime } from './ui.js';
 import * as AU from './audio.js';
 
@@ -14,9 +14,18 @@ export class ResultScene extends Phaser.Scene {
     const r = this.result, cx = GAME_W / 2;
     this.cameras.main.setBackgroundColor(0x05070f);
     const prevBest = getBest(r.courseId);
+    const firstClear = !prevBest;
     const upd = updateBest(r.courseId, r);
     const isBest = upd.newTime || upd.newScore;
     if (isBest) AU.SE.best(); else AU.SE.goal();
+
+    // ★ダイヤ報酬（カードゲームのガチャ用に加算）
+    let gems = 0; this.rewardLines = [];
+    if (r.noHitClear) { gems += 6000; this.rewardLines.push(['ノーヒット完走', '+💎6000']); }
+    if (firstClear) { gems += 300; this.rewardLines.push(['初完走ボーナス', '+💎300']); }
+    if (upd.newTime && !firstClear) { gems += 500; this.rewardLines.push(['ベストタイム更新', '+💎500']); }
+    if (gems > 0) grantGems(gems);
+    this.gemTotal = gems;
 
     this.add.text(cx, 70, r.noHitClear ? 'PERFECT CLEAR!' : 'CLEAR!', {
       fontFamily: 'sans-serif', fontSize: '34px', color: '#7CFC7C', fontStyle: '900',
@@ -43,14 +52,29 @@ export class ResultScene extends Phaser.Scene {
       ['NO HIT BONUS', r.noHitClear ? '+30000' : '0'],
       ['TARGET BONUS', r.clearTimeMs <= r.targetTimeMs ? '+20000' : '0'],
     ];
-    let y = 338;
+    let y = 332;
     rows.forEach(([k, v]) => {
       this.add.text(cx - 150, y, k, { fontFamily: 'sans-serif', fontSize: '14px', color: '#9fd99f' }).setOrigin(0, 0.5);
       this.add.text(cx + 150, y, v, { fontFamily: 'sans-serif', fontSize: '16px', color: '#eaffea', fontStyle: '700' }).setOrigin(1, 0.5);
-      y += 30;
+      y += 28;
     });
 
-    button(this, cx, y + 30, 300, 54, 'もう一度', { fontSize: 18, fill: 0x22c55e, color: '#04210f', onClick: () => { AU.unlock(); AU.SE.select(); this.scene.start('Game', { courseId: r.courseId, difficulty: r.difficulty }); } });
-    button(this, cx, y + 94, 300, 50, 'コース選択へ', { fontSize: 16, onClick: () => { AU.SE.select(); this.scene.start('Title'); } });
+    // ダイヤ報酬パネル
+    if (this.gemTotal > 0) {
+      y += 8;
+      this.add.rectangle(cx, y + 4 + this.rewardLines.length * 11, 320, 30 + this.rewardLines.length * 22, 0x1a1407, 1).setStrokeStyle(2, 0xffd23f, 0.8).setOrigin(0.5, 0);
+      this.add.text(cx, y + 14, '💎 ダイヤ獲得！', { fontFamily: 'sans-serif', fontSize: '15px', color: '#ffd23f', fontStyle: '800' }).setOrigin(0.5);
+      y += 34;
+      this.rewardLines.forEach(([k, v]) => {
+        this.add.text(cx - 140, y, k, { fontFamily: 'sans-serif', fontSize: '13px', color: '#fff3c4' }).setOrigin(0, 0.5);
+        this.add.text(cx + 140, y, v, { fontFamily: 'sans-serif', fontSize: '15px', color: '#ffd23f', fontStyle: '800' }).setOrigin(1, 0.5);
+        y += 22;
+      });
+      this.add.text(cx, y + 4, '計 💎' + this.gemTotal + ' → カードゲームのダイヤに加算', { fontFamily: 'sans-serif', fontSize: '12px', color: '#9fd99f' }).setOrigin(0.5);
+      y += 24;
+    }
+
+    button(this, cx, y + 28, 300, 54, 'もう一度', { fontSize: 18, fill: 0x22c55e, color: '#04210f', onClick: () => { AU.unlock(); AU.SE.select(); this.scene.start('Game', { courseId: r.courseId, difficulty: r.difficulty }); } });
+    button(this, cx, y + 90, 300, 48, 'コース選択へ', { fontSize: 16, onClick: () => { AU.SE.select(); this.scene.start('Title'); } });
   }
 }

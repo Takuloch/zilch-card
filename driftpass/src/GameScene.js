@@ -238,36 +238,35 @@ export class GameScene extends Phaser.Scene {
   stepCar(dt) {
     const car = this.car, cfg = this.cfg;
     car.prevX = car.x; car.prevY = car.y;
-    // steer
+    // ステア入力
     const inS = this.inputSteer();
     car.steer = P.moveToward(car.steer || 0, inS, cfg.steerReturnSpeed * dt);
-    // accel
-    car.speed = Math.min(cfg.maxSpeed, car.speed + cfg.acceleration * dt);
-    // turn
-    const turnRate = car.steer * cfg.steerStrength * (car.speed / cfg.maxSpeed);
+    // 旋回（止まっていても少し曲がれるよう下限を設ける）
+    const sp0 = Math.hypot(car.vx, car.vy);
+    const turnRate = car.steer * cfg.steerStrength * (0.45 + 0.75 * Math.min(1, sp0 / cfg.maxSpeed));
     car.angle += turnRate * dt;
-    // velocity blend toward heading
-    // 無操作時：進行方向へ緩く整える（counter-steerアシスト＝直線でスピンし続けない）
-    if (inS === 0 && (Math.hypot(car.vx, car.vy) > 30)) {
-      const travel = Math.atan2(car.vy, car.vx);
-      car.angle += P.angleDiff(travel, car.angle) * (cfg.alignAssist || 0.045);
-    }
+    // ★氷上モデル：エンジンは車体の向きへ推進、横方向の慣性はほぼ残る
     const fwd = P.vecFromAngle(car.angle);
-    const desired = { x: fwd.x * car.speed, y: fwd.y * car.speed };
-    // 常時低グリップ＝常にスライド。深いドリフト中はさらに滑る。
-    const driftNow = car.drift > cfg.driftThreshold && car.speed > cfg.maxSpeed * 0.25;
-    const grip = driftNow ? cfg.driftGrip : cfg.baseGrip;
-    const k = Math.min(1, grip * dt * 8);
-    car.vx = P.lerp(car.vx, desired.x, k);
-    car.vy = P.lerp(car.vy, desired.y, k);
-    // move
+    car.vx += fwd.x * cfg.acceleration * dt;
+    car.vy += fwd.y * cfg.acceleration * dt;
+    // 横滑り成分をほんの少しだけ戻す（iceGrip≒0 ＝ ツルツル）
+    const fdot = car.vx * fwd.x + car.vy * fwd.y;
+    const latx = car.vx - fwd.x * fdot, laty = car.vy - fwd.y * fdot;
+    car.vx -= latx * cfg.iceGrip; car.vy -= laty * cfg.iceGrip;
+    // 慣性を保つ弱い摩擦
+    car.vx *= cfg.friction; car.vy *= cfg.friction;
+    // 最高速で頭打ち
+    let sp = Math.hypot(car.vx, car.vy);
+    if (sp > cfg.maxSpeed) { const m = cfg.maxSpeed / sp; car.vx *= m; car.vy *= m; sp = cfg.maxSpeed; }
+    car.speed = sp;
+    // 移動
     car.x += car.vx * dt; car.y += car.vy * dt;
-    // drift angle
+    // ドリフト角＝車体の向きと進行方向の差（氷上なので常に大きく出る）
     const vmag = Math.hypot(car.vx, car.vy) || 0.0001;
     car.drift = Math.abs(P.angleDiff(car.angle, Math.atan2(car.vy, car.vx)));
-    const isDrift = car.drift > cfg.driftThreshold && car.speed > cfg.maxSpeed * 0.25;
-    // 過度な横滑りは速度を少し削る（壁に刺さりやすくしすぎない）
-    if (car.drift > 1.2) car.speed *= 0.985;
+    const isDrift = car.drift > cfg.driftThreshold && car.speed > cfg.maxSpeed * 0.18;
+    // 真横〜逆向きの過剰スピンは慣性を少し削る（完全制御不能を防ぐ）
+    if (car.drift > 1.4) { car.vx *= 0.97; car.vy *= 0.97; }
     // sprite
     this.sprite.setPosition(car.x, car.y);
     this.sprite.rotation = car.angle + Math.PI / 2;

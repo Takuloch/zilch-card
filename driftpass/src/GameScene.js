@@ -358,20 +358,35 @@ export class GameScene extends Phaser.Scene {
   }
 
   /* ---------- 一時停止 ---------- */
+  // 画面固定の素のボタン（矩形＋テキスト）。カメラが動くGameSceneでも確実にタップできる。
+  fixedButton(x, y, w, h, label, fill, color, onClick) {
+    const rect = this.add.rectangle(x, y, w, h, fill, 1).setStrokeStyle(2, 0x4ade80, 1)
+      .setScrollFactor(0).setDepth(72).setInteractive({ useHandCursor: true });
+    const txt = this.add.text(x, y, label, { fontFamily: 'sans-serif', fontSize: '18px', color: color || '#eaffea', fontStyle: '800' })
+      .setOrigin(0.5).setScrollFactor(0).setDepth(73);
+    rect.on('pointerdown', () => { rect.setScale(0.96); });
+    rect.on('pointerup', () => { rect.setScale(1); AU.SE.select(); onClick(); });
+    rect.on('pointerout', () => { rect.setScale(1); });
+    return [rect, txt];
+  }
+
   togglePause() {
     if (this.state === 'PLAYING') {
       this.state = 'PAUSED';
       AU.setSkid(false); AU.stopEngine();
-      this.pauseLayer = this.add.container(0, 0).setScrollFactor(0).setDepth(70);
-      const bg = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.7);
-      const t = this.add.text(GAME_W / 2, GAME_H / 2 - 120, 'PAUSE', { fontFamily: 'sans-serif', fontSize: '34px', color: '#7CFC7C', fontStyle: '900' }).setOrigin(0.5);
-      this.pauseLayer.add([bg, t]);
-      this.pauseLayer.add(button(this, GAME_W / 2, GAME_H / 2 - 30, 240, 52, '再開', { onClick: () => this.togglePause() }));
-      this.pauseLayer.add(button(this, GAME_W / 2, GAME_H / 2 + 36, 240, 52, 'リスタート', { onClick: () => { this.scene.restart({ courseId: this.courseId, difficulty: this.difficulty }); } }));
-      this.pauseLayer.add(button(this, GAME_W / 2, GAME_H / 2 + 102, 240, 52, 'コース選択へ', { fill: 0x10241a, onClick: () => { AU.stopEngine(); AU.setSkid(false); this.scene.start('Title'); } }));
+      const objs = [];
+      const bg = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.78)
+        .setScrollFactor(0).setDepth(70).setInteractive(); // 背後への貫通タップを防ぐ
+      const t = this.add.text(GAME_W / 2, GAME_H / 2 - 150, 'PAUSE', { fontFamily: 'sans-serif', fontSize: '34px', color: '#7CFC7C', fontStyle: '900' })
+        .setOrigin(0.5).setScrollFactor(0).setDepth(73);
+      objs.push(bg, t);
+      objs.push(...this.fixedButton(GAME_W / 2, GAME_H / 2 - 40, 270, 56, '再開', 0x22c55e, '#04210f', () => this.togglePause()));
+      objs.push(...this.fixedButton(GAME_W / 2, GAME_H / 2 + 32, 270, 56, 'リスタート', 0x16321f, '#eaffea', () => { this.scene.restart({ courseId: this.courseId, difficulty: this.difficulty }); }));
+      objs.push(...this.fixedButton(GAME_W / 2, GAME_H / 2 + 104, 270, 56, 'コース選択へ', 0x10241a, '#eaffea', () => { AU.stopEngine(); AU.setSkid(false); this.scene.start('Title'); }));
+      this.pauseObjs = objs;
     } else if (this.state === 'PAUSED') {
       this.state = 'PLAYING';
-      if (this.pauseLayer) { this.pauseLayer.destroy(); this.pauseLayer = null; }
+      if (this.pauseObjs) { this.pauseObjs.forEach((o) => o.destroy()); this.pauseObjs = null; }
       AU.startEngine();
     }
   }

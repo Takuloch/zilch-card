@@ -1558,7 +1558,7 @@ function makeMon(cid, o={}){
     attacks:0, maxAttacks:1, protUsed:false, hiroUsed:false, noBattleDestroy:false,
     cantAttackThisTurn:false, skipAttackNextOwnTurn:false, fromGraveByEffect:!!o.fromGrave,
     dieAtEnd:false, daikiExtraUsed:false, atkZero:false, battleBonus:0, battled:false,
-    wasSpecial:!!o.special, tkDriftUsed:false, locked:false};
+    wasSpecial:!!o.special, tkDriftUsed:false, locked:false, posChanged:false};
 }
 function fieldMons(side){
   const r = [];
@@ -2932,6 +2932,7 @@ function resetPerTurnFlags(){
       t.m.protUsed = false;
       t.m.hiroUsed = false;
       t.m.tkDriftUsed = false;
+      t.m.posChanged = false;
     }
     G[side].garageUsed = false;
     G[side].rainDrawUsed = false;
@@ -3058,7 +3059,7 @@ async function endDuel(winner, reason){
   const win = winner === 'p1';
   const online = !!G.online;
   if (online && NET.role === 'host') NET.send({t:'end', win:!win, reason});
-  const reward = online ? (win ? 300 : 150) : (win ? CPU_OPPONENTS[G.opIdx].reward : 150);
+  const reward = online ? (win ? 600 : 0) : (win ? CPU_OPPONENTS[G.opIdx].reward : 0);
   S.gems += reward;
   if (win) S.wins++; else S.losses++;
   save();
@@ -3072,7 +3073,7 @@ async function endDuel(winner, reason){
     + '<hr class="sep"><div style="font-size:13px;color:var(--text-secondary);line-height:1.8">'+esc(reason)+'</div>'
     + '<div style="margin:14px 0;font-size:15px;font-weight:800;color:var(--gold)">獲得：💎 '+reward+' G</div>'
     + '<button class="btn primary block" data-home="1">ホームへ戻る</button>'
-    + (win?'':'<div style="font-size:11px;color:var(--text-muted);margin-top:10px">負けても'+reward+'Gもらえる。ガチャでデッキを強化しよう</div>')
+    + (win?'':'<div style="font-size:11px;color:var(--text-muted);margin-top:10px">次は勝ってダイヤを獲得しよう</div>')
     + '</div>';
   veil.addEventListener('click', e=>{
     if (e.target.closest('[data-home]')){ AE.button(); veil.remove(); G = null; NET.reset(); go('home'); }
@@ -3277,11 +3278,26 @@ async function mainMonsterTap(zi){
   const m = G.p1.mz[zi];
   if (!m) return;
   const opts = [];
+  const canPos = G.phase==='main' && !m.sick && !m.posChanged;
+  if (canPos)
+    opts.push({label:(m.pos==='atk'?'🛡 守備表示にする':'⚔ 攻撃表示にする'), value:'pos', cls:'primary'});
   if (m.cid==='ZR002' && !G.p1.takuyaBuffUsed && fieldMons('p1').length)
     opts.push({label:'疾走の加護：モンスター1体ATK+800＆戦闘破壊耐性（1ターン1度）', value:'tkbuff', cls:'gold'});
   opts.push({label:'カード詳細を見る', value:'detail'});
   const v = await actionMenu('「'+monName(m)+'」', opts);
   if (v==='detail'){ showCardModal(m.cid); return; }
+  if (v==='pos'){
+    if (NET.role === 'guest'){ NET.send({t:'act', kind:'pos', zi}); return; }
+    await playerAction(async ()=>{
+      const mm = G.p1.mz[zi];
+      if (!mm || mm.sick || mm.posChanged || G.phase!=='main') { toast('今は表示形式を変えられない'); return; }
+      mm.pos = (mm.pos==='atk') ? 'def' : 'atk';
+      mm.posChanged = true;
+      AE.button();
+      log('「'+monName(mm)+'」を'+(mm.pos==='def'?'守備':'攻撃')+'表示に変更');
+    });
+    return;
+  }
   if (v==='tkbuff'){
     if (NET.role === 'guest'){ NET.send({t:'act', kind:'tkbuff', zi}); return; }
     await playerAction(async ()=>{
@@ -3589,8 +3605,13 @@ app.addEventListener('click', async e=>{
       break;
     case 'save-manage': AE.button(); showSaveManager(); break;
     case 'reset-data': {
-      const ok = await actionMenu('セーブデータを完全に消去しますか？', [{label:'消去する', value:true, cls:'danger'}]);
-      if (ok){ localStorage.removeItem(SAVE_KEY); loadSave(); go('title'); toast('データを初期化しました'); }
+      const ok = await actionMenu('セーブデータを完全に消去しますか？（ミニゲームの記録も消えます）', [{label:'消去する', value:true, cls:'danger'}]);
+      if (ok){
+        localStorage.removeItem(SAVE_KEY);
+        /* ミニゲーム(ZILCH DRIFT)の記録も初期化 */
+        try{ localStorage.removeItem('driftpass_save_v1'); localStorage.removeItem('zilch_drift_secrets'); localStorage.removeItem('zilch_pending_gems'); }catch(e){}
+        loadSave(); go('title'); toast('データを初期化しました（ミニゲーム含む）');
+      }
       break;
     }
     case 'gacha-pull': AE.button(); gachaPull(); break;
@@ -3952,7 +3973,7 @@ async function endDuelRemote(win, reason){
   if (G) G.over = true;
   if (SCREEN==='battle') renderBattle();
   updateBgm();
-  const reward = win ? 300 : 150;
+  const reward = win ? 600 : 0;
   S.gems += reward;
   if (win) S.wins++; else S.losses++;
   save();
@@ -3987,6 +4008,7 @@ async function hostAct(a){
       case 'spell':if (okHi) await playSpellFromHand('p2', a.hi); break;
       case 'set':  if (okHi) await setCard('p2', a.hi); break;
       case 'szAct': if (Number.isInteger(a.si) && a.si>=0 && a.si<5) await activateTrapFromZone('p2', a.si); break;
+      case 'pos': { const mm=(Number.isInteger(a.zi)&&a.zi>=0&&a.zi<5)?G.p2.mz[a.zi]:null; if (mm && !mm.sick && !mm.posChanged && G.phase==='main'){ mm.pos=(mm.pos==='atk')?'def':'atk'; mm.posChanged=true; log('「'+monName(mm)+'」を'+(mm.pos==='def'?'守備':'攻撃')+'表示に変更'); } break; }
       case 'coffee': {
         const sz = Number.isInteger(a.si) ? G.p2.sz[a.si] : null;
         if (sz && sz.faceUp && sz.cid==='ZC005' && !G.p2.coffeeDrawUsed && !effectsLocked() && G.phase==='main'){
